@@ -3,92 +3,544 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Epilogue: Support &amp; Privacy</title>
+<title>Epilogue: Every trip, mapped from your photos</title>
+<meta name="description" content="Epilogue turns the photos already on your iPhone into a map of every trip you've taken. Private by design: no account, and your photos are never uploaded.">
+<meta name="theme-color" content="#15161A">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:title" content="Epilogue: Every trip, mapped from your photos">
+<meta property="og:description" content="Turn your camera roll into a map of every trip you've taken.">
+<meta property="og:image" content="assets/screens/hero.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Nunito:wght@800;900&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="assets/screens/hero.webp">
 <style>
-  :root { --bg:#16171B; --card:#202228; --ink:#F4F5F8; --muted:#A3A9B6; --teal:#2CD5EB; --gold:#C08C30; }
+  :root {
+    --bg: #15161A;
+    --surface: #1F2128;
+    --line: #2B2E36;
+    --ink: #F2F3F7;
+    --muted: #9BA1AE;
+    --accent: #5B8DEF;
+    --accent-ink: #0E1630;
+    --glow: #5B8DEF;
+    --phone-w: clamp(220px, min(23vw, calc((100vh - 190px) / 2.3)), 330px);
+    --ease: cubic-bezier(.2, .7, .2, 1);
+    color-scheme: dark;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
-  main { max-width: 720px; margin: 0 auto; padding: 48px 20px 80px; }
-  h1 { font-size: 40px; margin: 0 0 4px; letter-spacing: -0.5px; }
-  h2 { font-size: 24px; margin: 40px 0 8px; }
-  h3 { font-size: 17px; margin: 24px 0 4px; }
-  p, li { color: var(--ink); }
-  .muted { color: var(--muted); }
-  .card { background: var(--card); border-radius: 20px; padding: 20px 22px; margin-top: 16px; }
-  a { color: var(--teal); }
-  nav a { margin-right: 18px; font-weight: 600; }
-  ul { padding-left: 20px; }
-  hr { border: 0; border-top: 1px solid #2C2F37; margin: 48px 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.6 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  h1, h2, .brand { font-family: "Nunito", "Inter", sans-serif; font-weight: 900; letter-spacing: -0.02em; }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: fixed; inset: 0 0 auto 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px clamp(16px, 4vw, 48px);
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid transparent; transition: border-color .3s;
+  }
+  .topbar.scrolled { border-bottom-color: var(--line); }
+  .brand { font-size: 22px; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  .brand-mark { width: 30px; height: 30px; display: block; }
+  .topbar nav { display: flex; align-items: center; gap: 24px; }
+  .topbar nav a:not(.btn) { color: var(--muted); text-decoration: none; font-weight: 500; font-size: 15px; }
+  .topbar nav a:not(.btn):hover { color: var(--ink); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--accent); color: var(--accent-ink);
+    font-weight: 600; text-decoration: none; border-radius: 999px;
+    padding: 12px 22px; font-size: 16px; transition: transform .2s var(--ease), filter .2s;
+  }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+  .btn-sm { padding: 8px 16px; font-size: 14px; }
+
+  /* ---------- Story: sticky phone + scrolling text ---------- */
+  html, body { overflow-x: clip; }
+  .story {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    max-width: 1200px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px);
+  }
+  .stage {
+    position: sticky; top: 0; height: 100vh; height: 100svh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+    padding-top: 64px;
+  }
+  .stage::before {
+    content: ""; position: absolute; width: 140%; aspect-ratio: 1; z-index: -1;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 26%, transparent), transparent);
+    transition: background 1s var(--ease);
+  }
+
+  .phone {
+    width: var(--phone-w); aspect-ratio: 1206 / 2622;
+    padding: calc(var(--phone-w) * .035);
+    border-radius: calc(var(--phone-w) * .17);
+    background: #0A0B0D;
+    box-shadow:
+      0 0 0 1.5px #3A3D45,
+      0 0 0 4px #121317,
+      0 40px 80px -20px rgba(0,0,0,.7),
+      0 20px 40px -10px rgba(0,0,0,.5);
+    box-sizing: content-box;
+    position: relative;
+  }
+  .phone::after { /* side button */
+    content: ""; position: absolute; right: -5px; top: 26%; width: 3px; height: 13%;
+    background: #2A2C32; border-radius: 0 2px 2px 0;
+  }
+  .screen {
+    position: relative; width: 100%; height: 100%;
+    border-radius: calc(var(--phone-w) * .135); overflow: hidden; background: #000;
+  }
+  .screen img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    opacity: 0; transform: scale(1.04);
+    transition: opacity .55s var(--ease), transform .8s var(--ease);
+  }
+  .screen img.is-active { opacity: 1; transform: none; }
+  .island {
+    position: absolute; z-index: 2; top: 2.4%; left: 50%; transform: translateX(-50%);
+    width: 30%; height: 3.6%; background: #000; border-radius: 999px;
+  }
+
+  /* Progress pills, echoing the app's onboarding dots */
+  .progress { display: flex; gap: 6px; }
+  .progress button {
+    width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px;
+    background: #3A3D47; cursor: pointer; transition: width .35s var(--ease), background .35s;
+  }
+  .progress button.is-active { width: 26px; background: var(--accent); }
+
+  .chapters { padding: 0 0 20vh; }
+  .chapter { padding-top: 10vh; }
+  .beat {
+    min-height: 72vh; display: flex; flex-direction: column; justify-content: center;
+    max-width: 30rem; opacity: .28; transition: opacity .5s var(--ease);
+  }
+  .beat.is-active { opacity: 1; }
+  .chapter > .beat:first-child { min-height: 90vh; }
+  .hero .beat { min-height: 100vh; min-height: 100svh; }
+  /* Map styles: the copy stays pinned while empty beats scroll past and flip the styles */
+  .styles > .beat:first-child { position: sticky; top: calc(50vh - 160px); min-height: 0; padding-top: 0; }
+  .styles > .beat:not(:first-child) { min-height: 50vh; }
+  .styles > .beat:last-child { min-height: 70vh; }
+
+  .eyebrow {
+    font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 12px;
+  }
+  h1 { font-size: clamp(44px, 6vw, 76px); line-height: 1.02; margin: 0 0 20px; }
+  h2 { font-size: clamp(32px, 3.6vw, 48px); line-height: 1.08; margin: 0 0 16px; }
+  .lede { font-size: clamp(18px, 1.5vw, 21px); color: var(--muted); margin: 0 0 28px; }
+  .beat p { color: var(--muted); margin: 0; }
+  .beat p.lede { margin-bottom: 28px; }
+  .beat p.lede:last-child { margin-bottom: 0; }
+  .beat h3 { font-size: 20px; margin: 0 0 6px; color: var(--ink); }
+  .step-num {
+    display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 14px; margin-bottom: 14px;
+  }
+  .hero-meta { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 24px; color: var(--muted); font-size: 15px; }
+  .hero-meta span::before { content: "✓"; color: var(--accent); margin-right: 8px; font-weight: 700; }
+  .scroll-hint { margin-top: 56px; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+  .scroll-hint i { width: 1px; height: 36px; background: linear-gradient(var(--muted), transparent); animation: hint 2s infinite; }
+  @keyframes hint { 0%,100% { transform: translateY(0); opacity: 1; } 50% { transform: translateY(8px); opacity: .4; } }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 22px; }
+  .chip {
+    padding: 8px 16px; border-radius: 999px; background: var(--surface); color: var(--muted);
+    font-family: inherit; font-weight: 600; font-size: 15px; line-height: 1.4; border: 0; cursor: pointer;
+    transition: background .35s, color .35s;
+  }
+  .chip:hover { color: var(--ink); }
+  .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chip.is-active { background: var(--ink); color: var(--bg); }
+
+  .stats { display: flex; gap: 28px; margin-top: 26px; }
+  .stats b { display: block; font-family: "Nunito", sans-serif; font-weight: 900; font-size: 34px; color: var(--ink); line-height: 1.1; }
+  .stats span { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+  /* ---------- CTA ---------- */
+  .cta {
+    text-align: center; padding: 18vh 20px 16vh;
+    background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
+    border-top: 1px solid var(--line);
+  }
+  .cta-icon {
+    display: block; margin: 0 auto 28px; border-radius: 22px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 24px 48px -12px rgba(0,0,0,.7);
+  }
+  .brand-mark { border-radius: 7px; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
+  .cta h2 { max-width: 14ch; margin: 0 auto 16px; }
+  .cta .lede { max-width: 34rem; margin: 0 auto 32px; }
+
+  /* ---------- Support & Privacy ---------- */
+  .info { max-width: 760px; margin: 0 auto; padding: 0 20px 100px; }
+  .info section { scroll-margin-top: 110px; }
+  .info h2 { font-size: 34px; margin: 72px 0 8px; }
+  .info h3 { font-size: 18px; margin: 28px 0 4px; }
+  .info p, .info li { color: #C9CDD6; }
+  .info .muted { color: var(--muted); }
+  .info ul { padding-left: 20px; }
+  .card { background: var(--surface); border-radius: 22px; padding: 20px 24px; margin-top: 16px; }
+  .info hr { border: 0; border-top: 1px solid var(--line); margin: 64px 0 0; }
+  footer {
+    border-top: 1px solid var(--line); color: var(--muted); font-size: 14px;
+    padding: 28px clamp(16px, 4vw, 48px); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  footer a { color: var(--muted); margin-left: 18px; }
+
+  /* ---------- Mobile: phone pins to the top, text scrolls below ---------- */
+  @media (max-width: 880px) {
+    :root { --phone-w: min(38vw, 20vh); }
+    .topbar nav a:not(.btn) { display: none; }
+    .story { grid-template-columns: minmax(0, 1fr); }
+    .stage {
+      height: auto; top: 0; z-index: 10; padding: 72px 0 18px; gap: 14px;
+      background: var(--bg);
+    }
+    .stage::after {
+      content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 40px;
+      background: linear-gradient(var(--bg), transparent); pointer-events: none;
+    }
+    .stage::before { width: 110%; }
+    .chapters { padding-bottom: 30vh; }
+    .chapter { padding-top: 0; }
+    .beat, .chapter > .beat:first-child, .hero .beat { min-height: 52vh; justify-content: flex-start; padding-top: 4vh; max-width: none; }
+    .hero .beat { min-height: 60vh; }
+    .styles > .beat:first-child { top: var(--stage-h, 50vh); padding-top: 2vh; min-height: 0; background: var(--bg); }
+    .styles > .beat:not(:first-child) { min-height: 34vh; }
+    .scroll-hint { display: none; }
+    h1 { font-size: 40px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .screen img, .beat, .progress button, .chip { transition: none; transform: none; }
+    .scroll-hint i { animation: none; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>Epilogue</h1>
-  <p class="muted">Every trip, mapped from your photos.</p>
-  <nav><a href="#support">Support</a><a href="#privacy">Privacy Policy</a></nav>
 
-  <section id="support">
-    <h2>Support</h2>
-    <div class="card">
-      <p>Need help, found a bug or have an idea? Email <a href="mailto:epilogue.jw@gmail.com">epilogue.jw@gmail.com</a> and include your iPhone model and iOS version. We usually reply within a few days.</p>
+<header class="topbar" id="top">
+  <a class="brand" href="#top" aria-label="Epilogue home">
+    <img class="brand-mark" src="assets/icon-192.png" alt="" width="30" height="30">
+    Epilogue
+  </a>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#privacy">Privacy</a>
+    <a href="#support">Support</a>
+  </nav>
+</header>
+
+<main>
+  <div class="story">
+    <div class="stage" aria-hidden="true">
+      <div class="phone">
+        <div class="screen" id="screen"><div class="island"></div></div>
+      </div>
+      <div class="progress" id="progress"></div>
     </div>
 
-    <h3>Why didn't some of my photos become pins?</h3>
-    <p>Epilogue places pins using the location saved in each photo. Screenshots, saved images and photos taken with Location Services turned off for the Camera have no location. You can place those on the map by hand.</p>
+    <div class="chapters">
 
-    <h3>Why is a route shown as a straight dashed line?</h3>
-    <p>Road routes are fetched the first time you're online after adding a stop. Until then, Epilogue shows a straight line between the stops.</p>
+      <section class="chapter hero" data-glow="#5B8DEF">
+        <div class="beat" data-screen="hero" data-alt="Epilogue welcome screen showing a route with three photo pins">
+          <p class="eyebrow">For iPhone</p>
+          <h1>Every trip, mapped from your photos.</h1>
+          <p class="lede">Epilogue turns the photos already in your camera roll into a map of everywhere you've been. Every road, every stop, every year.</p>
+          <div class="hero-meta"><span>No account</span><span>Photos never uploaded</span></div>
+          <div class="scroll-hint"><i></i>Scroll to explore</div>
+        </div>
+      </section>
 
-    <h3>Epilogue can't see my photos.</h3>
-    <p>Open Settings › Privacy &amp; Security › Photos › Epilogue and choose Full Access, or use Select More Photos inside the app to add more.</p>
+      <section class="chapter" id="features" data-glow="#5B8DEF">
+        <div class="beat" data-screen="find-trips" data-alt="Find your trips screen explaining how photos are scanned">
+          <p class="eyebrow">Find your trips</p>
+          <h2>Years of travel, found in seconds.</h2>
+          <p class="lede">Epilogue looks at where and when your photos were taken, then groups them into trips. Everyday photos from home are skipped automatically.</p>
+        </div>
+        <div class="beat" data-screen="scanning" data-alt="Scanning 3,150 of 10,832 photos">
+          <span class="step-num">2</span>
+          <h3>Scanned on your phone</h3>
+          <p>Thousands of photos are read right on your iPhone. Nothing is copied or uploaded, and you can stop at any time to see what's been found so far.</p>
+        </div>
+        <div class="beat" data-screen="trips-found" data-alt="82 trips found, with a list of trips to tick">
+          <span class="step-num">3</span>
+          <h3>You choose what to keep</h3>
+          <p>Tick the trips you want. Rename, split or edit them later, and new photos join the trips you already have.</p>
+        </div>
+      </section>
 
-    <h3>How do I back up my trips?</h3>
-    <p>Your trips are stored only on your iPhone. Use Settings › Export in the app to save a copy you can keep elsewhere.</p>
+      <section class="chapter" data-glow="#E0A23A">
+        <div class="beat" data-screen="globe" data-alt="A dark globe showing coloured trip routes across Asia and around Australia">
+          <p class="eyebrow">Your map</p>
+          <h2>Your whole world, on one globe.</h2>
+          <p class="lede">Every trip gets its own colour, traced along the roads you actually took. Spin the globe, filter by year, and see how far you've come.</p>
+        </div>
+      </section>
+
+      <section class="chapter" data-glow="#3D6FF0">
+        <div class="beat" data-screen="japan" data-alt="Map zoomed into Japan with several trip routes">
+          <p class="eyebrow">Every detail</p>
+          <h2>Zoom in on any trip.</h2>
+          <p class="lede">Pick a trip and follow it stop by stop, from the big picture down to a single morning.</p>
+        </div>
+        <div class="beat" data-screen="japan-route" data-alt="A Japan 2019 route with numbered stops">
+          <span class="step-num">2</span>
+          <h3>Real routes, not straight lines</h3>
+          <p>Stops are joined along real roads, so your map shows the drive, not just the dots.</p>
+        </div>
+        <div class="beat" data-screen="stop" data-alt="A stop at Muikamachi with a photo of snowy mountains">
+          <span class="step-num">3</span>
+          <h3>Your photos, right where you took them</h3>
+          <p>Tap a stop to see its photos, the date and the trip it belongs to.</p>
+        </div>
+      </section>
+
+      <section class="chapter styles" data-glow="#4FA3E0">
+        <div class="beat intro">
+          <p class="eyebrow">Map styles</p>
+          <h2>Make the map look how you like.</h2>
+          <p class="lede">Switch between plain, outdoors and satellite maps, in light or dark.</p>
+          <div class="chips" role="group" aria-label="Map style">
+            <button class="chip" type="button">Plain</button><button class="chip" type="button">Outdoors</button><button class="chip" type="button">Satellite</button><button class="chip" type="button">Light</button>
+          </div>
+        </div>
+        <div class="beat" data-screen="style-dark" data-chip="0" data-alt="Globe in the plain dark map style"></div>
+        <div class="beat" data-screen="style-outdoors" data-chip="1" data-alt="Globe in the outdoors map style"></div>
+        <div class="beat" data-screen="style-satellite" data-chip="2" data-alt="Globe in the satellite map style"></div>
+        <div class="beat" data-screen="style-light" data-chip="3" data-alt="Globe in the light map style"></div>
+      </section>
+
+      <section class="chapter" data-glow="#E5534B">
+        <div class="beat" data-screen="countries" data-alt="Countries screen showing 15 countries on a world map with continent progress">
+          <p class="eyebrow">Countries</p>
+          <h2>See how much of the world you've seen.</h2>
+          <p class="lede">A world map of every country you've visited, with your progress across each continent.</p>
+          <div class="stats">
+            <div><b>15</b><span>Countries</span></div>
+            <div><b>112</b><span>Trips</span></div>
+            <div><b>7.2%</b><span>Of the world</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" data-glow="#5B8DEF">
+        <div class="beat" data-screen="photo-access" data-alt="Photo access screen explaining that photos are never copied or uploaded">
+          <p class="eyebrow">Private by design</p>
+          <h2>Your travels stay on your phone.</h2>
+          <p class="lede">No account, no sign-up, no servers of ours. Epilogue reads only the location and time of the photos you choose.</p>
+        </div>
+        <div class="beat" data-screen="privacy-settings" data-alt="Privacy and data settings with export, import and delete options">
+          <span class="step-num">2</span>
+          <h3>You're in control</h3>
+          <p>Photos you share from Epilogue have their GPS removed by default. Export a backup whenever you like, or delete everything in one tap.</p>
+        </div>
+      </section>
+
+      <section class="chapter" data-glow="#9B5BEF">
+        <div class="beat" data-screen="colour" data-alt="Colour wheel for choosing the app's accent colour">
+          <p class="eyebrow">Make it yours</p>
+          <h2>Your colour, your rules.</h2>
+          <p class="lede">Pick any colour on the wheel, bold at the edge or softer towards the centre. It's used for buttons and highlights across the app, and you can change it any time.</p>
+        </div>
+        <div class="beat" data-screen="trip-settings" data-alt="Settings for merging photos and splitting trips">
+          <span class="step-num">2</span>
+          <h3>Trips that match how you travel</h3>
+          <p>Choose how close photos must be to merge into one stop, and how long a gap starts a new trip.</p>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <section class="cta" id="download">
+    <img class="cta-icon" src="assets/icon-192.png" alt="Epilogue app icon" width="96" height="96">
+    <h2>Your next trip is already in your camera roll.</h2>
+    <p class="lede">Download Epilogue and see every place you've been, mapped in minutes.</p>
   </section>
 
-  <hr>
+  <div class="info">
+    <section id="support">
+      <h2>Support</h2>
+      <div class="card">
+        <p>Need help, found a bug or have an idea? Email <a href="mailto:epilogue.jw@gmail.com">epilogue.jw@gmail.com</a> and include your iPhone model and iOS version. We usually reply within a few days.</p>
+      </div>
 
-  <section id="privacy">
-    <h2>Privacy Policy</h2>
-    <p class="muted">Last updated: 18 November 2026</p>
+      <h3>Why didn't some of my photos become pins?</h3>
+      <p>Epilogue places pins using the location saved in each photo. Screenshots, saved images and photos taken with Location Services turned off for the Camera have no location. You can place those on the map by hand.</p>
 
-    <p>Epilogue is built to keep your travels private. This policy explains what the app accesses and where that information goes.</p>
+      <h3>Why is a route shown as a straight dashed line?</h3>
+      <p>Road routes are fetched the first time you're online after adding a stop. Until then, Epilogue shows a straight line between the stops.</p>
 
-    <h3>What stays on your device</h3>
-    <ul>
-      <li>Your trips, pins, notes and stats are stored only on your iPhone.</li>
-      <li>Epilogue reads the location and date of the photos you choose. Your photos are never uploaded or copied off your device.</li>
-      <li>There is no account and no sign-up. We don't run our own servers, and we don't collect your name, email or contacts.</li>
-      <li>We don't use our own analytics, advertising or tracking.</li>
-    </ul>
+      <h3>Epilogue can't see my photos.</h3>
+      <p>Open Settings › Privacy &amp; Security › Photos › Epilogue and choose Full Access, or use Select More Photos inside the app to add more.</p>
 
-    <h3>Maps and routes (Mapbox)</h3>
-    <p>Epilogue uses <a href="https://www.mapbox.com/">Mapbox</a> to show maps and to work out road routes between your stops. To do this, the app sends the following to Mapbox:</p>
-    <ul>
-      <li>Requests for the map area you're viewing.</li>
-      <li>The coordinates of two consecutive stops when a road route is needed.</li>
-    </ul>
-    <p>The Mapbox map also sends anonymous usage information, which may include your approximate position on the map, to help Mapbox improve its service.</p>
-    <p>None of this is linked to your identity. Mapbox's handling of this data is covered by the <a href="https://www.mapbox.com/legal/privacy">Mapbox Privacy Policy</a>.</p>
+      <h3>How do I back up my trips?</h3>
+      <p>Your trips are stored only on your iPhone. Use Settings › Export in the app to save a copy you can keep elsewhere.</p>
+    </section>
 
-    <h3>Your current location</h3>
-    <p>If you allow it, Epilogue uses your current location only to centre the map on where you are. Epilogue doesn't store it or send it to us. The Mapbox map may include it in the anonymous usage information described above.</p>
+    <hr>
 
-    <h3>Sharing</h3>
-    <p>When you share a trip or pin, you choose where it goes. By default, location data is removed from photos you share out of the app.</p>
+    <section id="privacy">
+      <h2>Privacy Policy</h2>
+      <p class="muted">Last updated: 18 November 2026</p>
 
-    <h3>Deleting your data</h3>
-    <p>Deleting a pin or trip in the app removes it. Deleting the app removes all Epilogue data from your device.</p>
+      <p>Epilogue is built to keep your travels private. This policy explains what the app accesses and where that information goes.</p>
 
-    <h3>Children</h3>
-    <p>Epilogue isn't directed at children under 13 and doesn't knowingly collect information from them.</p>
+      <h3>What stays on your device</h3>
+      <ul>
+        <li>Your trips, pins, notes and stats are stored only on your iPhone.</li>
+        <li>Epilogue reads the location and date of the photos you choose. Your photos are never uploaded or copied off your device.</li>
+        <li>There is no account and no sign-up. We don't run our own servers, and we don't collect your name, email or contacts.</li>
+        <li>We don't use our own analytics, advertising or tracking.</li>
+      </ul>
 
-    <h3>Changes</h3>
-    <p>If this policy changes, we'll update this page and the date above.</p>
+      <h3>Maps and routes (Mapbox)</h3>
+      <p>Epilogue uses <a href="https://www.mapbox.com/">Mapbox</a> to show maps and to work out road routes between your stops. To do this, the app sends the following to Mapbox:</p>
+      <ul>
+        <li>Requests for the map area you're viewing.</li>
+        <li>The coordinates of two consecutive stops when a road route is needed.</li>
+      </ul>
+      <p>The Mapbox map also sends anonymous usage information, which may include your approximate position on the map, to help Mapbox improve its service.</p>
+      <p>None of this is linked to your identity. Mapbox's handling of this data is covered by the <a href="https://www.mapbox.com/legal/privacy">Mapbox Privacy Policy</a>.</p>
 
-    <h3>Contact</h3>
-    <p>Questions about privacy: <a href="mailto:epilogue.jw@gmail.com">epilogue.jw@gmail.com</a></p>
-  </section>
+      <h3>Your current location</h3>
+      <p>If you allow it, Epilogue uses your current location only to centre the map on where you are. Epilogue doesn't store it or send it to us. The Mapbox map may include it in the anonymous usage information described above.</p>
+
+      <h3>Sharing</h3>
+      <p>When you share a trip or pin, you choose where it goes. By default, location data is removed from photos you share out of the app.</p>
+
+      <h3>Deleting your data</h3>
+      <p>Deleting a pin or trip in the app removes it. Deleting the app removes all Epilogue data from your device.</p>
+
+      <h3>Children</h3>
+      <p>Epilogue isn't directed at children under 13 and doesn't knowingly collect information from them.</p>
+
+      <h3>Changes</h3>
+      <p>If this policy changes, we'll update this page and the date above.</p>
+
+      <h3>Contact</h3>
+      <p>Questions about privacy: <a href="mailto:epilogue.jw@gmail.com">epilogue.jw@gmail.com</a></p>
+    </section>
+  </div>
 </main>
+
+<footer>
+  <span>© 2026 Epilogue</span>
+  <span><a href="#support">Support</a><a href="#privacy">Privacy Policy</a><a href="mailto:epilogue.jw@gmail.com">Contact</a></span>
+</footer>
+
+<script>
+(() => {
+  const screen = document.getElementById('screen');
+  const progress = document.getElementById('progress');
+  const stage = document.querySelector('.stage');
+  const topbar = document.querySelector('.topbar');
+  const chapters = [...document.querySelectorAll('.chapter')];
+  const beats = [...document.querySelectorAll('.beat[data-screen]')];
+  const imgs = {};
+
+  // One <img> per unique screen, stacked inside the phone.
+  beats.forEach((beat, i) => {
+    const name = beat.dataset.screen;
+    if (imgs[name]) return;
+    const img = new Image();
+    img.src = `assets/screens/${name}.webp`;
+    img.alt = beat.dataset.alt || '';
+    img.decoding = 'async';
+    if (i > 2) img.loading = 'lazy';
+    screen.appendChild(img);
+    imgs[name] = img;
+  });
+
+  // One progress pill per chapter; clicking jumps to it.
+  const pills = chapters.map((ch) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', 'Go to section');
+    b.addEventListener('click', () => ch.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    progress.appendChild(b);
+    return b;
+  });
+
+  let current = null;
+  function setActive(beat) {
+    if (beat === current) return;
+    current = beat;
+    beats.forEach(b => b.classList.toggle('is-active', b === beat));
+    Object.entries(imgs).forEach(([n, img]) => img.classList.toggle('is-active', n === beat.dataset.screen));
+
+    const chapter = beat.closest('.chapter');
+    const ci = chapters.indexOf(chapter);
+    pills.forEach((p, i) => p.classList.toggle('is-active', i === ci));
+    document.documentElement.style.setProperty('--glow', chapter.dataset.glow || '#5B8DEF');
+
+    // Pinned intro copy (map styles) stays lit while any beat in its chapter is active;
+    // its chips follow the empty beats scrolling past underneath.
+    document.querySelectorAll('.beat.intro').forEach(intro => {
+      const here = intro.closest('.chapter') === chapter;
+      intro.classList.toggle('is-active', here);
+      intro.querySelectorAll('.chip').forEach((c, i) =>
+        c.classList.toggle('is-active', here && String(i) === beat.dataset.chip));
+    });
+  }
+
+  // The beat crossing the "reading line" drives the phone.
+  // Desktop: middle of the viewport. Mobile: middle of the area below the pinned phone.
+  function readingLine() {
+    const stageH = stage.getBoundingClientRect().height;
+    document.documentElement.style.setProperty('--stage-h', stageH + 'px');
+    return matchMedia('(max-width: 880px)').matches
+      ? stageH + (innerHeight - stageH) * 0.35
+      : innerHeight * 0.5;
+  }
+
+  // Map-style pills: scroll to that style's beat so the phone and pills stay in sync.
+  document.querySelectorAll('.beat.intro').forEach(intro => {
+    intro.querySelectorAll('.chip').forEach((chip, i) => {
+      chip.addEventListener('click', () => {
+        const target = intro.closest('.chapter').querySelector(`.beat[data-chip="${i}"]`);
+        const top = target.getBoundingClientRect().top + scrollY;
+        scrollTo({ top: top - readingLine() + 60, behavior: 'smooth' });
+      });
+    });
+  });
+
+  function update() {
+    topbar.classList.toggle('scrolled', scrollY > 10);
+    const line = readingLine();
+    let best = beats[0], bestDist = Infinity;
+    for (const b of beats) {
+      const r = b.getBoundingClientRect();
+      const d = r.top <= line && r.bottom >= line ? 0 : Math.min(Math.abs(r.top - line), Math.abs(r.bottom - line));
+      if (d < bestDist) { bestDist = d; best = b; }
+    }
+    setActive(best);
+  }
+
+  let ticking = false;
+  const onScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { update(); ticking = false; });
+  };
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll);
+  update();
+})();
+</script>
 </body>
 </html>
