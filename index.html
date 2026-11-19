@@ -102,16 +102,220 @@
     position: relative; width: 100%; height: 100%;
     border-radius: calc(var(--phone-w) * .135); overflow: hidden; background: #000;
   }
-  .screen img {
+  .screen img.shot {
     position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
     opacity: 0; transform: scale(1.04);
     transition: opacity .55s var(--ease), transform .8s var(--ease);
   }
-  .screen img.is-active { opacity: 1; transform: none; }
+  .screen img.shot.is-active { opacity: 1; transform: none; }
   .island {
     position: absolute; z-index: 2; top: 2.4%; left: 50%; transform: translateX(-50%);
     width: 30%; height: 3.6%; background: #000; border-radius: 999px;
   }
+
+  /* ---------- Intro: photo → camera → pocket → app ---------- */
+  .intro-spacer { height: 360vh; height: 360svh; }
+  .intro-bg { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: #000; }
+  .intro-bg.done, .intro-copy.done, .pocket.done { visibility: hidden; }
+  .intro-photo {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    transform-origin: 50% 60%; will-change: transform, opacity;
+  }
+  .intro-bg::after { /* legibility for the tagline */
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,.15) 55%, rgba(0,0,0,.35));
+    opacity: var(--scrim, 1);
+  }
+  .intro-dark { position: absolute; inset: 0; background: #0B0C0F; opacity: 0; }
+  .denim {
+    position: absolute; inset: 0; opacity: 0;
+    background-color: #2E4C76;
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .16 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>"),
+      repeating-linear-gradient(118deg, rgba(255,255,255,.07) 0 2px, transparent 2px 6px),
+      repeating-linear-gradient(28deg, rgba(0,0,0,.16) 0 1px, transparent 1px 5px),
+      radial-gradient(130% 100% at 50% 35%, transparent 35%, rgba(0,0,0,.6));
+  }
+  .denim::before, .denim::after { /* yoke seam */
+    content: ""; position: absolute; left: -5%; right: -5%; top: 16%;
+    border-top: 2px dashed #D99A48; transform: rotate(-4deg); opacity: .8;
+  }
+  .denim::after { top: calc(16% + 9px); }
+
+  .intro-copy { position: fixed; inset: 0; z-index: 11; pointer-events: none; color: #fff; }
+  .intro-hero {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 0 clamp(16px, 5vw, 64px) clamp(28px, 7vh, 72px);
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px;
+  }
+  .intro-hero h1 {
+    font-size: clamp(46px, 7.4vw, 108px); line-height: .98; margin: 0; max-width: 11ch;
+    text-shadow: 0 2px 30px rgba(0,0,0,.35);
+  }
+  /* Liquid glass capsule */
+  .place-card {
+    position: relative; isolation: isolate;
+    display: flex; gap: 14px; align-items: center; pointer-events: auto;
+    padding: 10px 28px 10px 10px; border-radius: 999px;
+    background:
+      linear-gradient(160deg, rgba(255,255,255,.22), rgba(255,255,255,.06) 45%, rgba(255,255,255,.12)),
+      rgba(10, 14, 22, .14);
+    backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
+    -webkit-backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
+    box-shadow:
+      inset 0 1px 1px rgba(255,255,255,.7),
+      inset 0 -1px 1px rgba(255,255,255,.18),
+      inset 0 0 22px rgba(255,255,255,.10),
+      0 12px 32px -8px rgba(0,0,0,.35),
+      0 2px 6px rgba(0,0,0,.12);
+    text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  }
+  .place-card::before { /* specular rim: bright top-left and bottom-right, clear elsewhere */
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; z-index: -1;
+    background: linear-gradient(135deg,
+      rgba(255,255,255,.95), rgba(255,255,255,.25) 22%, rgba(255,255,255,.05) 45%,
+      rgba(255,255,255,.05) 60%, rgba(255,255,255,.35) 85%, rgba(255,255,255,.8));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    pointer-events: none;
+  }
+  .place-card::after { /* soft sheen across the upper half */
+    content: ""; position: absolute; inset: 1px; border-radius: inherit; z-index: -1;
+    background: radial-gradient(120% 70% at 25% -10%, rgba(255,255,255,.28), transparent 60%);
+    pointer-events: none;
+  }
+  .place-pin {
+    width: 46px; height: 46px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; color: #fff;
+    background: radial-gradient(circle at 35% 30%, #8FB3FF, var(--accent) 55%, #3A6BD8);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.6), inset 0 -2px 4px rgba(0,0,0,.18), 0 4px 12px rgba(40,80,200,.35);
+  }
+  .place-text { display: flex; flex-direction: column; line-height: 1.35; }
+  .place-text b { font-size: 16px; }
+  .place-text span { font-size: 14px; color: rgba(255,255,255,.88); }
+  .place-text small { font-size: 12.5px; color: rgba(255,255,255,.72); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .intro-hint {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.7);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .intro-hint i { width: 1px; height: 28px; background: linear-gradient(rgba(255,255,255,.8), transparent); animation: hint 2s infinite; }
+
+  .intro-caption {
+    position: absolute; top: 50%; left: calc(50% + var(--phone-w) / 2 + 64px);
+    max-width: 21rem; margin: 0; opacity: 0;
+    font-family: "Nunito", sans-serif; font-weight: 900; font-size: clamp(28px, 2.8vw, 40px); line-height: 1.1;
+    text-shadow: 0 2px 24px rgba(0,0,0,.4);
+  }
+  .intro-caption span {
+    display: block; margin-top: 12px;
+    font: 400 18px/1.55 "Inter", sans-serif; color: rgba(255,255,255,.78);
+  }
+
+  .pocket {
+    position: fixed; z-index: 12; left: 50%; top: 58vh; pointer-events: none; opacity: 0;
+    width: calc(var(--pw, 330px) * 1.72); aspect-ratio: 200 / 220;
+    filter: drop-shadow(0 -4px 10px rgba(0,0,0,.45)) drop-shadow(0 10px 18px rgba(0,0,0,.35));
+  }
+  .pocket svg { display: block; width: 100%; height: 100%; }
+
+  /* Phone rig: one phone for the whole page, transformed by scroll during the intro */
+  .stage { z-index: 5; }
+  .chapters { position: relative; z-index: 6; }
+  .phone-rig { perspective: 1100px; will-change: transform; }
+  .phone-flip {
+    position: relative; transform-style: preserve-3d; will-change: transform;
+    --depth: calc(var(--phone-w) * .075);
+  }
+  .phone {
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    transform: translateZ(calc(var(--depth) / 2));
+  }
+  /* Thickness: thin rounded slices stacked between the faces form the metal frame */
+  .phone-edge {
+    position: absolute; inset: 0; border-radius: calc(var(--phone-w) * .17);
+    background: linear-gradient(90deg, #8A8F99, #4A4E57 3%, #2B2D33 10%, #2B2D33 90%, #4A4E57 97%, #8A8F99);
+  }
+  .phone-edge:nth-child(odd) { filter: brightness(1.12); }
+  /* Lighting: faces darken as they turn away; a glare sweeps across during the flip */
+  .phone::before, .phone-back::after {
+    content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    border-radius: inherit;
+    background:
+      linear-gradient(rgba(0,0,0,var(--shade, 0)), rgba(0,0,0,var(--shade, 0))),
+      linear-gradient(105deg, transparent 38%, rgba(255,255,255,calc(var(--gloss, 0) * .22)) 50%, transparent 62%);
+    background-size: 100% 100%, 300% 100%;
+    background-position: 0 0, calc(100% - var(--glare, 0) * 100%) 0;
+  }
+  .phone { border-radius: calc(var(--phone-w) * .17); }
+  .phone-back {
+    position: absolute; inset: 0; transform: rotateY(180deg) translateZ(calc(var(--depth) / 2));
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    border-radius: calc(var(--phone-w) * .17);
+    background: linear-gradient(150deg, #474B54, #24262C 45%, #1A1B20 70%, #34373E);
+    box-shadow: inset 0 0 0 2px #5A5F69, inset 0 0 0 5px #1B1C21, 0 40px 80px -20px rgba(0,0,0,.7);
+  }
+  .bump {
+    position: absolute; top: 3.2%; left: 7%; width: 44%; aspect-ratio: 1;
+    border-radius: 24%; background: rgba(255,255,255,.07);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 4px 10px rgba(0,0,0,.4);
+  }
+  .bump i {
+    position: absolute; width: 40%; aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle at 40% 38%, #3B4A66 0 12%, #0B0D12 28%, #050608 55%, #2A2C33 58% 66%, #0E0F13 70%);
+    box-shadow: 0 0 0 2px #2B2D33;
+  }
+  .bump i:first-child { top: 8%; left: 8%; }
+  .bump i:nth-child(2) { bottom: 8%; right: 8%; }
+  .bump b { position: absolute; top: 14%; right: 16%; width: 12%; aspect-ratio: 1; border-radius: 50%; background: #E8DFC8; opacity: .8; }
+
+  /* Camera viewfinder shown during the intro */
+  .screen { font-size: calc(var(--phone-w) * .042); }
+  .camera-ui { position: absolute; inset: 0; z-index: 1; background: #000; color: #fff; }
+  .cam-view {
+    position: absolute; left: 0; top: 12%; width: 100%; height: 61.5%;
+    object-fit: cover; object-position: var(--fx, 50%) 50%;
+  }
+  .cam-zoom {
+    position: absolute; top: calc(73.5% - 2.9em); left: 0; right: 0;
+    display: flex; justify-content: center; gap: .45em;
+  }
+  .cam-zoom span {
+    width: 2.1em; height: 2.1em; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(0,0,0,.45); font-size: .7em; font-weight: 600;
+  }
+  .cam-zoom .on { color: #FFD60A; width: 2.5em; height: 2.5em; font-size: .78em; }
+  .cam-modes {
+    position: absolute; top: 76.5%; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 1.3em;
+    font-size: .64em; font-weight: 600; letter-spacing: .06em; color: rgba(255,255,255,.75);
+  }
+  .cam-modes .on { color: #FFD60A; }
+  .cam-controls {
+    position: absolute; top: 82%; left: 0; right: 0; padding: 0 10%;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cam-thumb {
+    width: 2.7em; height: 2.7em; border-radius: .45em; background: #1C1C1E center / cover no-repeat;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
+  }
+  .cam-shutter {
+    width: 4.7em; height: 4.7em; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 .22em #000 inset, 0 0 0 .24em #fff; transition: transform .15s;
+  }
+  .cam-swap {
+    width: 2.7em; height: 2.7em; border-radius: 50%; background: rgba(255,255,255,.14);
+    display: grid; place-items: center;
+  }
+  .cam-swap svg { width: 1.3em; height: 1.3em; }
+  .cam-flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+
+  .intro-active .progress, .intro-active .stage::before, .intro-active .hero .beat { opacity: 0; }
+  .progress { transition: opacity .4s; }
+  .stage::before { transition: background 1s var(--ease), opacity .4s; }
+
+  .hero-title { font-size: clamp(40px, 5vw, 68px); line-height: 1.04; }
 
   /* Progress pills, echoing the app's onboarding dots */
   .progress { display: flex; gap: 6px; }
@@ -218,6 +422,15 @@
     .chapter { padding-top: 0; }
     .beat, .chapter > .beat:first-child, .hero .beat { min-height: 52vh; justify-content: flex-start; padding-top: 4vh; max-width: none; }
     .hero .beat { min-height: 60vh; }
+    .intro-active .stage { background: transparent; }
+    .intro-active .stage::after { opacity: 0; }
+    .intro-hero { flex-direction: column; align-items: flex-start; padding-bottom: 64px; }
+    .intro-caption {
+      top: auto; bottom: 5vh; left: 16px; right: 16px; max-width: none; text-align: center; font-size: 26px;
+    }
+    .intro-caption span { font-size: 16px; margin-top: 8px; }
+    #capPocket { top: 84px; bottom: auto; }
+    .hero .beat { padding-top: calc(var(--stage-h, 50vh) + 2vh); min-height: calc(var(--stage-h, 50vh) + 60vh); }
     .styles > .beat:first-child { top: var(--stage-h, 50vh); padding-top: 2vh; min-height: 0; background: var(--bg); }
     .styles > .beat:not(:first-child) { min-height: 34vh; }
     .scroll-hint { display: none; }
@@ -226,7 +439,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .screen img, .beat, .progress button, .chip { transition: none; transform: none; }
+    .screen img.shot, .beat, .progress button, .chip { transition: none; transform: none; }
     .scroll-hint i { animation: none; }
   }
 </style>
@@ -245,24 +458,117 @@
   </nav>
 </header>
 
+<!-- Intro backdrop: random travel photo, then denim -->
+<div class="intro-bg" id="introBg" aria-hidden="true">
+  <img class="intro-photo" id="introPhoto" alt="">
+  <div class="intro-dark" id="introDark"></div>
+  <div class="denim" id="denim"></div>
+</div>
+<script>
+  // Pick one of three photos before first paint so there's no flash.
+  window.PLACE = (() => {
+    const places = [
+      { img: 'au-phillip-island', name: 'Phillip Island Grand Prix Circuit', region: 'Victoria, Australia',
+        coords: '38.50° S, 145.23° E', date: '18 Oct 2024', fx: '68%' },
+      { img: 'nz-treble-cone', name: 'Treble Cone', region: 'Wānaka, New Zealand',
+        coords: '44.63° S, 168.89° E', alt: '1,354 m', date: '4 Aug 2024', fx: '50%' },
+      { img: 'us-badwater-basin', name: 'Badwater Basin', region: 'Death Valley, California',
+        coords: '36.23° N, 116.77° W', alt: '−86 m', date: '2 Jan 2024', fx: '50%' },
+    ];
+    const p = places[Math.floor(Math.random() * places.length)];
+    const img = document.getElementById('introPhoto');
+    img.srcset = `assets/hero/${p.img}-1200.webp 1200w, assets/hero/${p.img}-2400.webp 2400w`;
+    img.sizes = '100vw';
+    img.src = `assets/hero/${p.img}-2400.webp`;
+    return p;
+  })();
+</script>
+
+<div class="intro-copy">
+  <div class="intro-hero" id="introHero">
+    <h1>All trips deserve an epilogue.</h1>
+    <div class="place-card" id="placeCard">
+      <span class="place-pin" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg>
+      </span>
+      <span class="place-text">
+        <b id="placeName"></b>
+        <span id="placeRegion"></span>
+        <small id="placeMeta"></small>
+      </span>
+    </div>
+    <div class="intro-hint"><i></i>Scroll</div>
+  </div>
+  <p class="intro-caption" id="capPhoto">It starts with a photo.<span>You were there. You took the shot.</span></p>
+  <p class="intro-caption" id="capPocket">Then it goes back in your pocket.<span>One photo among thousands in your camera roll, never looked at again.</span></p>
+</div>
+
+<div class="pocket" id="pocket" aria-hidden="true">
+  <svg viewBox="0 0 200 220">
+    <defs>
+      <pattern id="twill" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)">
+        <rect width="5" height="5" fill="#34547E"/>
+        <rect width="1.4" height="5" fill="#4C6E9A" opacity=".7"/>
+        <rect x="2.8" width=".7" height="5" fill="#1E3656" opacity=".7"/>
+      </pattern>
+      <filter id="grain" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/>
+        <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .22 0"/>
+      </filter>
+      <clipPath id="pocketShape"><path d="M8 10 H192 L186 160 L100 214 L14 160 Z"/></clipPath>
+    </defs>
+    <path d="M8 10 H192 L186 160 L100 214 L14 160 Z" fill="url(#twill)"/>
+    <rect width="200" height="220" filter="url(#grain)" clip-path="url(#pocketShape)"/>
+    <rect x="8" y="10" width="184" height="3" fill="#000" opacity=".25"/>
+    <g fill="none" stroke="#D99A48" stroke-width="1.2" stroke-dasharray="3.2 2.4" stroke-linecap="round">
+      <path d="M12 19 H188"/>
+      <path d="M12 25 H188"/>
+      <path d="M15 12 L20 157 L100 207 L180 157 L185 12"/>
+      <path d="M20 12 L25 154 L100 201 L175 154 L180 12"/>
+    </g>
+  </svg>
+</div>
+
 <main>
   <div class="story">
     <div class="stage" aria-hidden="true">
-      <div class="phone">
-        <div class="screen" id="screen"><div class="island"></div></div>
+      <div class="phone-rig" id="rig">
+        <div class="phone-flip" id="flip">
+          <div class="phone">
+            <div class="screen" id="screen">
+              <div class="island"></div>
+              <div class="camera-ui" id="cameraUI">
+                <img class="cam-view" id="camView" alt="">
+                <div class="cam-zoom"><span>.5</span><span class="on">1×</span><span>2</span></div>
+                <div class="cam-modes"><span>VIDEO</span><span class="on">PHOTO</span><span>PORTRAIT</span></div>
+                <div class="cam-controls">
+                  <div class="cam-thumb" id="camThumb"></div>
+                  <div class="cam-shutter" id="camShutter"></div>
+                  <div class="cam-swap">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>
+                  </div>
+                </div>
+                <div class="cam-flash" id="camFlash"></div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-back">
+            <div class="bump"><i></i><i></i><b></b></div>
+          </div>
+        </div>
       </div>
       <div class="progress" id="progress"></div>
     </div>
 
     <div class="chapters">
+      <div class="intro-spacer" id="introSpacer"></div>
 
       <section class="chapter hero" data-glow="#5B8DEF">
         <div class="beat" data-screen="hero" data-alt="Epilogue welcome screen showing a route with three photo pins">
           <p class="eyebrow">For iPhone</p>
-          <h1>Every trip, mapped from your photos.</h1>
+          <h2 class="hero-title">Every trip, mapped from your photos.</h2>
           <p class="lede">Epilogue turns the photos already in your camera roll into a map of everywhere you've been. Every road, every stop, every year.</p>
           <div class="hero-meta"><span>No account</span><span>Photos never uploaded</span></div>
-          <div class="scroll-hint"><i></i>Scroll to explore</div>
         </div>
       </section>
 
@@ -459,6 +765,7 @@
     const name = beat.dataset.screen;
     if (imgs[name]) return;
     const img = new Image();
+    img.className = 'shot';
     img.src = `assets/screens/${name}.webp`;
     img.alt = beat.dataset.alt || '';
     img.decoding = 'async';
@@ -531,14 +838,138 @@
     setActive(best);
   }
 
+  /* ---------- Intro: photo → camera → pocket → app ---------- */
+  const P = window.PLACE;
+  const $ = id => document.getElementById(id);
+  const rig = $('rig'), flip = $('flip'), spacer = $('introSpacer');
+  const els = {
+    bg: $('introBg'), photo: $('introPhoto'), dark: $('introDark'), denim: $('denim'),
+    copy: document.querySelector('.intro-copy'), hero: $('introHero'),
+    capPhoto: $('capPhoto'), capPocket: $('capPocket'), pocket: $('pocket'),
+    camera: $('cameraUI'), flash: $('camFlash'), thumb: $('camThumb'), shutter: $('camShutter'),
+  };
+  $('placeName').textContent = P.name;
+  $('placeRegion').textContent = P.region;
+  $('placeMeta').textContent = [P.date, P.coords, P.alt].filter(Boolean).join(' · ');
+  els.photo.alt = `Photo taken at ${P.name}, ${P.region}`;
+  $('camView').src = `assets/hero/${P.img}-1200.webp`;
+  $('camView').style.setProperty('--fx', P.fx);
+
+  // Build the phone's thickness from stacked slices between the front and back faces.
+  const SLICES = 14;
+  for (let i = 0; i < SLICES; i++) {
+    const s = document.createElement('div');
+    s.className = 'phone-edge';
+    const z = ((i + 0.5) / SLICES - 0.5) * 0.96;
+    s.style.transform = `translateZ(calc(var(--depth) * ${z.toFixed(3)}))`;
+    flip.insertBefore(s, flip.firstChild);
+  }
+
+  const clamp01 = x => Math.min(1, Math.max(0, x));
+  const seg = (t, a, b) => clamp01((t - a) / (b - a));
+  const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const band = (t, a, b, c, d) => seg(t, a, b) * (1 - seg(t, c, d)); // fade in a→b, out c→d
+
+  let base = null; // phone position with no transform applied
+  function measure() {
+    const prev = rig.style.transform;
+    rig.style.transform = 'none';
+    const r = rig.getBoundingClientRect();
+    rig.style.transform = prev;
+    base = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height };
+  }
+
+  // Timeline in viewport heights of scroll:
+  // 0–0.35 photo + tagline · 0.35–1.25 phone rises · ~1.5 shutter · 1.85–2.55 flip into pocket
+  // 2.55–2.85 rest in pocket · 2.85–3.6 denim clears, phone flips back and moves to its column
+  const END = 3.6;
+  let lastT = -1;
+  function intro() {
+    const vh = spacer.offsetHeight / END;
+    const t = scrollY / vh;
+    const done = t >= END;
+    document.documentElement.classList.toggle('intro-active', t < END - 0.2);
+    [els.bg, els.copy, els.pocket].forEach(e => e.classList.toggle('done', done));
+    if (done) {
+      if (lastT < END) {
+        rig.style.transform = ''; flip.style.transform = ''; els.camera.style.opacity = 0;
+        ['--shade', '--glare', '--gloss'].forEach(v => flip.style.removeProperty(v));
+      }
+      lastT = t;
+      return;
+    }
+    lastT = t;
+    if (!base) measure();
+
+    const mobile = matchMedia('(max-width: 880px)').matches;
+    const S = mobile ? 1.35 : 1;
+    const H = base.h * S;
+    const offY = innerHeight / 2 + H / 2 + 60;
+    const pocketTop = innerHeight * 0.58;
+    const pocketY = pocketTop + H * 0.12 - innerHeight / 2;
+
+    const a = ease(seg(t, 0.35, 1.25));
+    const b = ease(seg(t, 1.85, 2.55));
+    const c = ease(seg(t, 2.85, END));
+    const y = t < 1.85 ? lerp(offY, 0, a) : t < 2.85 ? lerp(0, pocketY, b) : lerp(pocketY, 0, c);
+    const k = 1 - c; // 1 = centred in the viewport, 0 = resting in its column
+    const tx = (innerWidth / 2 - base.cx) * k;
+    const ty = (innerHeight / 2 - base.cy) * k + y;
+    const s = 1 + (S - 1) * k;
+    const rot = 180 * b + 180 * c;
+    rig.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${s})`;
+    const turning = Math.sin(Math.PI * b) + Math.sin(Math.PI * c);
+    flip.style.transform =
+      `rotateX(${8 * turning}deg) rotateY(${rot}deg) rotateZ(${-6 * Math.sin(Math.PI * b)}deg)`;
+    const face = Math.abs(Math.cos(rot * Math.PI / 180)); // 1 = facing viewer, 0 = side-on
+    flip.style.setProperty('--shade', ((1 - face) * 0.6).toFixed(3));
+    flip.style.setProperty('--glare', ((rot % 180) / 180).toFixed(3));
+    flip.style.setProperty('--gloss', Math.min(1, turning).toFixed(3));
+
+    // Front face shows the camera until it's turned away; the app is there when it turns back.
+    els.camera.style.opacity = (t < 2.85 || rot < 230) ? 1 : 0;
+    const shot = band(t, 1.42, 1.47, 1.5, 1.68);
+    els.flash.style.opacity = shot * 0.9;
+    els.shutter.style.transform = `scale(${1 - 0.1 * band(t, 1.38, 1.44, 1.48, 1.56)})`;
+    els.thumb.style.backgroundImage = t > 1.48 ? `url(assets/hero/${P.img}-1200.webp)` : 'none';
+
+    // Backdrop
+    const toDenim = seg(t, 1.8, 2.2);
+    els.photo.style.opacity = 1 - toDenim;
+    els.photo.style.transform = `scale(${1.08 - 0.08 * a})`;
+    els.bg.style.setProperty('--scrim', String(1 - toDenim));
+    const clear = seg(t, 2.92, 3.15);
+    els.dark.style.opacity = 0.5 * a * (1 - toDenim) + clear;
+    els.denim.style.opacity = toDenim * (1 - clear);
+    // Pocket pops in while the phone is edge-on (invisible), and slides away solid as the phone lifts out.
+    els.pocket.style.opacity = seg(t, 2.18, 2.22) * (1 - seg(t, 3.05, 3.15));
+    els.pocket.style.setProperty('--pw', base.w * S + 'px');
+    els.pocket.style.transform = `translate(-50%, ${ease(clear) * innerHeight * 0.55}px)`;
+    els.pocket.style.top = pocketTop + 'px';
+    els.bg.style.opacity = 1 - seg(t, 3.1, 3.35);
+
+    // Copy
+    const heroOut = seg(t, 0.2, 0.6);
+    els.hero.style.opacity = 1 - heroOut;
+    els.hero.style.transform = `translateY(${-40 * heroOut}px)`;
+    const cp = band(t, 1.05, 1.3, 1.7, 1.9);
+    els.capPhoto.style.opacity = cp;
+    els.capPhoto.style.transform = `translateY(calc(${mobile ? 0 : -50}% + ${(1 - cp) * 20}px))`;
+    const cq = band(t, 2.3, 2.5, 2.8, 2.95);
+    els.capPocket.style.opacity = cq;
+    els.capPocket.style.transform = `translateY(calc(${mobile ? 0 : -50}% + ${(1 - cq) * 20}px))`;
+  }
+
   let ticking = false;
   const onScroll = () => {
     if (ticking) return;
     ticking = true;
-    requestAnimationFrame(() => { update(); ticking = false; });
+    requestAnimationFrame(() => { intro(); update(); ticking = false; });
   };
   addEventListener('scroll', onScroll, { passive: true });
-  addEventListener('resize', onScroll);
+  addEventListener('resize', () => { base = null; lastT = -1; onScroll(); });
+  intro();
   update();
 })();
 </script>
