@@ -549,6 +549,7 @@
     <a href="#features">Features</a>
     <a href="#privacy">Privacy</a>
     <a href="#support">Support</a>
+    <a class="btn btn-sm" href="https://apps.apple.com/us/app/epilogue-trip-journal/id6835468897">Get the app</a>
   </nav>
 </header>
 
@@ -676,6 +677,7 @@
           <p class="eyebrow">For iPhone</p>
           <h2 class="hero-title">Every trip, mapped from your photos.</h2>
           <p class="lede">Epilogue turns the photos already in your camera roll into a map of everywhere you've been. Every road, every stop, every year.</p>
+          <div><a class="btn" href="https://apps.apple.com/us/app/epilogue-trip-journal/id6835468897">Download on the App Store</a></div>
           <div class="hero-meta"><span>No account</span><span>Photos never uploaded</span></div>
         </div>
       </section>
@@ -802,6 +804,7 @@
       <img class="cta-icon" src="assets/icon-192.png" alt="Epilogue app icon" width="96" height="96">
       <h2>Your next trip is already in your camera roll.</h2>
       <p class="lede">Download Epilogue and see every place you've been, mapped in minutes.</p>
+      <a class="btn" href="https://apps.apple.com/us/app/epilogue-trip-journal/id6835468897">Download on the App Store</a>
     </div>
   </section>
 
@@ -964,6 +967,13 @@
     setActive(best);
     updateRoute(line);
   }
+
+  // Logo: back to the very top. (#top is the fixed header, which never scrolls, so the anchor alone does nothing.)
+  document.querySelector('.brand').addEventListener('click', e => {
+    e.preventDefault();
+    scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    history.replaceState(null, '', location.pathname + location.search);
+  });
 
   /* ---------- Route progress bar ---------- */
   const navNodes = [...document.querySelectorAll('[data-nav]')];
