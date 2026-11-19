@@ -17,13 +17,13 @@ FONT = ImageFont.truetype("C:/Windows/Fonts/seguisb.ttf", 54 * 4)
 SCREENS = {
     1: "hero", 23: "colour", 4: "photo-access", 6: "find-trips", 7: "scanning",
     8: "trips-found", 10: "globe", 11: "japan", 12: "japan-route", 13: "stop",
-    14: "countries", 17: "trip-settings", 18: "privacy-settings",
+    14: "countries", 25: "trip-settings", 18: "privacy-settings",
     19: "style-outdoors", 20: "style-dark", 21: "style-satellite", 22: "style-light",
 }
 LIGHT = {22}
 # Rows (original px) to keep bright; everything else below the status bar is dimmed.
 KEEP = {
-    17: (478, 1100),   # Merge photos within + New trip after a gap of
+    25: (995, 1625),   # Merge photos within + New trip after a gap of
     18: (528, 1712),   # Privacy & Data section
 }
 
