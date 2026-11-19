@@ -428,6 +428,76 @@
   }
   footer a { color: var(--muted); margin-left: 18px; }
 
+  /* ---------- Route progress (navigation-app style) ---------- */
+  .route-nav {
+    position: fixed; z-index: 40; left: clamp(16px, 2.2vw, 36px); top: 50%;
+    height: min(64vh, 600px); transform: translateY(-46%);
+    display: flex; flex-direction: column; align-items: flex-start; gap: 18px;
+    transition: opacity .45s var(--ease), transform .45s var(--ease);
+  }
+  .intro-active .route-nav, .route-nav.off { opacity: 0; pointer-events: none; transform: translate(-12px, -46%); }
+  .rn-next {
+    display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border-radius: 16px;
+    background: rgba(31, 33, 40, .88); border: 1px solid var(--line);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 10px 24px -10px rgba(0,0,0,.6);
+  }
+  .rn-next svg {
+    width: 30px; height: 30px; padding: 5px; border-radius: 10px; flex: none;
+    background: var(--accent); color: #fff;
+  }
+  .rn-next span { display: flex; flex-direction: column; line-height: 1.2; }
+  .rn-next small { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .rn-next b { font-size: 14px; white-space: nowrap; }
+  /* The road: blue ahead, grey where you've been */
+  .rn-track {
+    position: relative; flex: 1; width: 8px; margin-left: 19px; border-radius: 4px;
+    background: var(--accent); box-shadow: 0 0 0 2px #0F1013, 0 0 18px rgba(91,141,239,.25);
+  }
+  .rn-done { position: absolute; left: 0; right: 0; top: 0; height: 0; border-radius: 4px; background: #4A4F5C; }
+  .rn-stop {
+    position: absolute; left: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0;
+    border-radius: 50%; background: #15161A; border: 3px solid #fff; cursor: pointer; z-index: 1;
+    transition: border-color .3s, transform .3s;
+  }
+  .rn-stop:hover { transform: scale(1.25); }
+  .rn-stop:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+  .rn-stop.passed { border-color: #7A808E; }
+  .rn-stop span {
+    position: absolute; left: 22px; top: 50%; transform: translateY(-50%); white-space: nowrap;
+    font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 3px 9px; border-radius: 999px;
+    transition: color .3s, background .3s;
+  }
+  .rn-stop.passed span { color: #6B7180; }
+  .rn-stop.current span { color: var(--ink); background: rgba(31, 33, 40, .92); box-shadow: 0 0 0 1px var(--line); }
+  /* Destination: chequered circle */
+  .rn-stop.dest {
+    width: 24px; height: 24px; margin: -12px 0 0 -12px; border: 3px solid #fff;
+    background: repeating-conic-gradient(#15161A 0 25%, #fff 0 50%) 50% / 8px 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.5);
+  }
+  /* You-are-here puck with heading arrow */
+  .rn-puck {
+    position: absolute; left: 50%; top: 0; width: 30px; height: 30px; margin: -15px 0 0 -15px; z-index: 2;
+    border-radius: 50%; background: var(--accent); border: 3px solid #fff;
+    box-shadow: 0 3px 10px rgba(0,0,0,.45); display: grid; place-items: center;
+  }
+  .rn-puck::before {
+    content: ""; position: absolute; inset: -12px; border-radius: 50%; z-index: -1;
+    background: radial-gradient(circle, rgba(91,141,239,.45), rgba(91,141,239,0) 70%);
+    animation: rn-halo 2.2s ease-out infinite;
+  }
+  @keyframes rn-halo { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+  .rn-puck svg { width: 18px; height: 18px; transition: transform .35s var(--ease); }
+  .route-nav.reverse .rn-puck svg { transform: rotate(180deg); }
+  @media (max-width: 1180px) {
+    .rn-stop:not(.current) span { opacity: 0; }
+    .rn-stop:hover span { opacity: 1; }
+  }
+  @media (min-width: 881px) { .progress { display: none; } } /* the route bar replaces the dots on desktop */
+  @media (max-width: 880px) { .route-nav { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .rn-puck::before { animation: none; } }
+
   /* ---------- Mobile: phone pins to the top, text scrolls below ---------- */
   @media (max-width: 880px) {
     :root { --phone-w: min(38vw, 20vh); }
@@ -481,6 +551,20 @@
     <a href="#support">Support</a>
   </nav>
 </header>
+
+<!-- Navigation-style progress: route ahead is blue, travelled part grey, puck shows where you are -->
+<nav class="route-nav" id="routeNav" aria-label="Page progress">
+  <div class="rn-next" aria-live="polite">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M6 20h12"/></svg>
+    <span><small id="rnNextLabel">Next</small><b id="rnNext"></b></span>
+  </div>
+  <div class="rn-track" id="rnTrack">
+    <div class="rn-done" id="rnDone"></div>
+    <div class="rn-puck" id="rnPuck" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 19 5.5 6.5 12 9.5l6.5-3z" fill="#fff"/></svg>
+    </div>
+  </div>
+</nav>
 
 <!-- Intro backdrop: random travel photo, then denim -->
 <div class="intro-bg" id="introBg" aria-hidden="true">
@@ -587,7 +671,7 @@
     <div class="chapters">
       <div class="intro-spacer" id="introSpacer"></div>
 
-      <section class="chapter hero" data-glow="#5B8DEF">
+      <section class="chapter hero" data-nav="Start" data-glow="#5B8DEF">
         <div class="beat" data-screen="hero" data-alt="Epilogue welcome screen showing a route with three photo pins">
           <p class="eyebrow">For iPhone</p>
           <h2 class="hero-title">Every trip, mapped from your photos.</h2>
@@ -596,7 +680,7 @@
         </div>
       </section>
 
-      <section class="chapter" id="features" data-glow="#5B8DEF">
+      <section class="chapter" id="features" data-nav="Your photos" data-glow="#5B8DEF">
         <div class="beat" data-screen="find-trips" data-alt="Find your trips screen explaining how photos are scanned">
           <p class="eyebrow">Find your trips</p>
           <h2>Years of travel, found in seconds.</h2>
@@ -614,7 +698,7 @@
         </div>
       </section>
 
-      <section class="chapter" data-glow="#E0A23A">
+      <section class="chapter" data-nav="Your map" data-glow="#E0A23A">
         <div class="beat" data-screen="globe" data-alt="A dark globe showing coloured trip routes across Asia and around Australia">
           <p class="eyebrow">Your map</p>
           <h2>Your whole world, on one globe.</h2>
@@ -622,7 +706,7 @@
         </div>
       </section>
 
-      <section class="chapter" data-glow="#3D6FF0">
+      <section class="chapter" data-nav="Your trip" data-glow="#3D6FF0">
         <div class="beat" data-screen="japan" data-alt="Map zoomed into Japan with several trip routes">
           <p class="eyebrow">Every detail</p>
           <h2>Zoom in on any trip.</h2>
@@ -640,7 +724,7 @@
         </div>
       </section>
 
-      <section class="chapter styles" data-glow="#4FA3E0">
+      <section class="chapter styles" data-nav="Your style" data-glow="#4FA3E0">
         <div class="beat intro">
           <p class="eyebrow">Map styles</p>
           <h2>Make the map look how you like.</h2>
@@ -655,7 +739,7 @@
         <div class="beat" data-screen="style-light" data-chip="3" data-alt="Globe in the light map style"></div>
       </section>
 
-      <section class="chapter" data-glow="#E5534B">
+      <section class="chapter" data-nav="Your world" data-glow="#E5534B">
         <div class="beat" data-screen="countries" data-alt="Countries screen showing 15 countries on a world map with continent progress">
           <p class="eyebrow">Countries</p>
           <h2>See how much of the world you've seen.</h2>
@@ -668,7 +752,7 @@
         </div>
       </section>
 
-      <section class="chapter" data-glow="#5B8DEF">
+      <section class="chapter" data-nav="Your privacy" data-glow="#5B8DEF">
         <div class="beat" data-screen="photo-access" data-alt="Photo access screen explaining that photos are never copied or uploaded">
           <p class="eyebrow">Private by design</p>
           <h2>Your travels stay on your phone.</h2>
@@ -681,7 +765,7 @@
         </div>
       </section>
 
-      <section class="chapter" data-glow="#9B5BEF">
+      <section class="chapter" data-nav="Make it yours" data-glow="#9B5BEF">
         <div class="beat" data-screen="colour" data-alt="Colour wheel for choosing the app's accent colour">
           <p class="eyebrow">Make it yours</p>
           <h2>Your colour, your rules.</h2>
@@ -697,7 +781,7 @@
     </div>
   </div>
 
-  <section class="cta" id="download">
+  <section class="cta" id="download" data-nav="Download">
     <!-- Background map: land from tools/build_cta_map.py, route drawn on scroll-in -->
     <div class="cta-map" aria-hidden="true">
       <img src="assets/cta-japan.svg" alt="">
@@ -878,6 +962,60 @@
       if (d < bestDist) { bestDist = d; best = b; }
     }
     setActive(best);
+    updateRoute(line);
+  }
+
+  /* ---------- Route progress bar ---------- */
+  const navNodes = [...document.querySelectorAll('[data-nav]')];
+  const routeNav = document.getElementById('routeNav');
+  const rnTrack = document.getElementById('rnTrack');
+  const navStops = navNodes.map((node, i) => {
+    const b = document.createElement('button');
+    const last = i === navNodes.length - 1;
+    b.className = 'rn-stop' + (last ? ' dest' : '');
+    b.innerHTML = `<span>${node.dataset.nav}</span>`;
+    b.setAttribute('aria-label', `Go to ${node.dataset.nav}`);
+    b.addEventListener('click', () => {
+      const top = node.getBoundingClientRect().top + scrollY;
+      scrollTo({ top: last ? top : top + 2, behavior: 'smooth' });
+    });
+    rnTrack.appendChild(b);
+    return b;
+  });
+  let lastY = scrollY;
+  function updateRoute(line) {
+    // Route runs from the first chapter to the download section; stops sit at their real offsets.
+    const tops = navNodes.map(n => n.getBoundingClientRect().top + scrollY);
+    const start = tops[0], end = tops[tops.length - 1];
+    const span = Math.max(1, end - start);
+    const at = scrollY + line;
+    const pos = tops.map(t => (t - start) / span);
+    pos.forEach((p, i) => { navStops[i].style.top = (p * 100) + '%'; });
+    // Highlight the same section the phone is showing; the destination once you reach it.
+    let cur = current ? Math.max(0, navNodes.indexOf(current.closest('.chapter'))) : 0;
+    if (at >= end - 2) cur = navNodes.length - 1;
+    // Stop-and-go: the puck parks centred on the current stop while you read,
+    // then drives to the next stop over the last part of the section.
+    let f = pos[cur];
+    if (cur < navNodes.length - 1) {
+      const local = Math.min(1, Math.max(0, (at - tops[cur]) / (tops[cur + 1] - tops[cur])));
+      const x = Math.min(1, Math.max(0, (local - 0.6) / 0.4));
+      f += (pos[cur + 1] - pos[cur]) * x * x * (3 - 2 * x);
+    }
+    navStops.forEach((b, i) => {
+      b.classList.toggle('passed', i < cur);
+      b.classList.toggle('current', i === cur);
+    });
+    document.getElementById('rnPuck').style.top = (f * 100) + '%';
+    document.getElementById('rnDone').style.height = (f * 100) + '%';
+    const next = navNodes[cur + 1];
+    document.getElementById('rnNextLabel').textContent = next ? 'Next' : 'Arrived';
+    document.getElementById('rnNext').textContent = next ? next.dataset.nav : 'Download';
+    // Hide once you've passed the destination (support & privacy below)
+    routeNav.classList.toggle('off', at > end + innerHeight * 0.6);
+    // Heading arrow flips when scrolling back up
+    if (Math.abs(scrollY - lastY) > 2) routeNav.classList.toggle('reverse', scrollY < lastY);
+    lastY = scrollY;
   }
 
   /* ---------- Intro: photo → camera → pocket → app ---------- */
