@@ -166,7 +166,9 @@
     animation: lb-in .35s var(--ease);
   }
   @keyframes lb-in { from { opacity: 0; transform: scale(.95) translateY(10px); } }
-  .lb-media { background: #000; display: grid; place-items: center; }
+  .lb-media { background: #000; display: grid; place-items: center; overflow: hidden; }
+  .lb-media img { transition: filter .3s ease, transform .3s ease; }
+  .lb-media img.loading { filter: blur(10px); transform: scale(1.03); }
   .lb-media img { display: block; max-width: min(1100px, 94vw); max-height: calc(86vh - 96px); width: auto; height: auto; }
   .lb-caption { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
   .lb-pin {
@@ -1003,6 +1005,7 @@
     if (imgs[name]) return;
     const img = new Image();
     img.className = 'shot';
+    img.width = 720; img.height = 1565; // declared size (all screenshots are 720×1565)
     img.src = `assets/screens/${name}.webp`;
     img.alt = beat.dataset.alt || '';
     img.decoding = 'async';
@@ -1269,6 +1272,8 @@
     const heroOut = seg(t, 0.2, 0.6);
     els.hero.style.opacity = 1 - heroOut;
     els.hero.style.transform = `translateY(${-40 * heroOut}px)`;
+    // Once faded, take the hero (and its clickable location card) out of the way of everything below
+    els.hero.style.visibility = heroOut > 0.95 ? 'hidden' : '';
     const cp = band(t, 1.05, 1.3, 1.7, 1.9);
     els.capPhoto.style.opacity = cp;
     els.capPhoto.style.transform = `translateY(calc(${mobile ? 0 : -50}% + ${(1 - cp) * 20}px))`;
@@ -1279,6 +1284,8 @@
 
   /* ---------- Album: floating photos that react to the cursor ---------- */
   // Photos carry no GPS, so places come from the file names; coordinates are the landmark's.
+  // Pixel sizes of the album thumbnails (so each <img> declares its dimensions)
+  const THUMB_SIZE = {"adelaide-city":[440,330],"albert-park-circuit":[440,330],"albert-park-garage":[330,440],"albert-park-gp":[440,330],"albert-park-lake":[440,330],"alfred-nicholas-gardens":[330,440],"au-phillip-island":[440,330],"cranbourne-gardens":[440,330],"flinders-ranges-2":[440,330],"flinders-ranges":[440,330],"fort-nepean":[330,440],"fox-car-collection":[330,440],"gippsland-rally":[440,248],"lake-tyrrell-2":[330,440],"lake-tyrrell-3":[330,440],"lake-tyrrell":[330,440],"moorabbin-airport":[330,440],"nz-treble-cone":[440,330],"phillip-island-pits":[330,440],"puffing-billy-trestle":[330,440],"steavenson-falls":[330,440],"us-badwater-basin":[440,330],"war-memorial":[330,440],"winton-raceway":[330,440]};
   const ALBUM = [
     ['fort-nepean', 'Fort Nepean', 'Point Nepean, Victoria', '38.31° S, 144.65° E', '17 Jul 2026 · 1:58 pm'],
     ['albert-park-circuit', 'Albert Park Circuit', 'Melbourne, Victoria', '37.85° S, 144.97° E', '21 Feb 2026 · 5:11 pm'],
@@ -1306,7 +1313,7 @@
     ['albert-park-garage', 'Albert Park pit lane', 'Melbourne, Victoria', '37.85° S, 144.97° E', '14 Mar 2025 · 1:40 pm'],
   ].map(([slug, title, region, coords, date, src]) => ({
     title, region, meta: `${date} · ${coords}`,
-    thumb: `assets/album/${slug}-t.webp`,
+    thumb: `assets/album/${slug}-t.webp`, size: THUMB_SIZE[slug] || [440, 330],
     large: src === 'hero' ? `assets/hero/${slug}-2400.webp` : `assets/album/${slug}-l.webp`,
   }));
   // Scattered around the heading: [x%, y%, width px at 1440 wide, depth 0.35–1]
@@ -1325,7 +1332,7 @@
       b.className = 'ph';
       b.setAttribute('aria-label', `${p.title}, ${p.region}`);
       b.style.setProperty('--r', `${((i * 37) % 17) - 8}deg`);
-      b.innerHTML = `<span><img src="${p.thumb}" alt="" loading="lazy" decoding="async"></span>`;
+      b.innerHTML = `<span><img src="${p.thumb}" width="${p.size[0]}" height="${p.size[1]}" style="aspect-ratio: ${p.size[0]} / ${p.size[1]}" alt="" loading="lazy" decoding="async"></span>`;
       b.addEventListener('click', () => { if (!narrowScreen.matches) open(i); }); // no viewer on phones
       cloud.appendChild(b);
       return { el: b, x, y, w, d, ph: i * 1.7 };
@@ -1424,16 +1431,41 @@
 
     /* Photo viewer */
     const lb = $('lightbox'), lbImg = $('lbImg');
-    let idx = 0, lastFocus = null;
+    let idx = 0, lastFocus = null, loadToken = 0;
     function show(i) {
       idx = (i + ALBUM.length) % ALBUM.length;
       const p = ALBUM[idx];
-      lbImg.src = p.large;
+      // Show the already-loaded small version at once (softly blurred), then swap in the
+      // full-size photo when it arrives, so the previous photo never flashes up.
+      const token = ++loadToken;
+      fitImage(cards[idx].el.querySelector('img'));
+      lbImg.src = p.thumb;
+      lbImg.classList.add('loading');
+      const full = new Image();
+      full.onload = () => {
+        if (token !== loadToken) return; // another photo was opened meanwhile
+        lbImg.src = p.large;
+        lbImg.classList.remove('loading');
+      };
+      full.src = p.large;
       lbImg.alt = `Photo at ${p.title}, ${p.region}`;
       $('lbTitle').textContent = p.title;
       $('lbRegion').textContent = p.region;
       $('lbMeta').textContent = p.meta;
     }
+    // Size the viewer image from the photo's proportions up front, so it opens at full size
+    // and doesn't jump when the sharp version replaces the small one.
+    let fitFrom = null;
+    function fitImage(src) {
+      fitFrom = src;
+      const r = src && src.naturalWidth ? src.naturalWidth / src.naturalHeight : 4 / 3;
+      const maxW = Math.min(1100, innerWidth * 0.94), maxH = innerHeight * 0.86 - 96;
+      let w = maxW, ht = w / r;
+      if (ht > maxH) { ht = maxH; w = ht * r; }
+      lbImg.style.width = Math.round(w) + 'px';
+      lbImg.style.height = Math.round(ht) + 'px';
+    }
+    addEventListener('resize', () => { if (!lb.hidden) fitImage(fitFrom); });
     function open(i) {
       lastFocus = document.activeElement;
       show(i);
