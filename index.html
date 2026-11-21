@@ -294,25 +294,42 @@
   }
   .pocket svg { display: block; width: 100%; height: 100%; }
 
+  /* Forgotten in the pocket: the scene darkens and cobwebs spin out from the corners */
+  .lair { position: fixed; inset: 0; z-index: 13; pointer-events: none; visibility: hidden; }
+  .lair-dim {
+    position: absolute; inset: 0; opacity: 0; will-change: opacity;
+    background: radial-gradient(120% 95% at 50% 62%, rgba(3,4,7,.5), rgba(3,4,7,.93) 78%);
+  }
+  .web {
+    position: absolute; width: clamp(170px, 30vw, 440px); aspect-ratio: 1; overflow: visible;
+    opacity: 0; will-change: transform, opacity;
+  }
+  .web.tl { left: 0; top: 0; transform-origin: 0 0; }
+  .web.tr { right: 0; top: 0; transform-origin: 100% 0; }
+  .web.bl { left: 0; bottom: 0; transform-origin: 0 100%; }
+  .web.br { right: 0; bottom: 0; transform-origin: 100% 100%; }
+  .web path {
+    fill: none; stroke: rgba(228, 232, 242, .5); stroke-width: .3; stroke-linecap: round; /* viewBox units: ~1px */
+    /* each thread draws itself in its own slice (--a start, --b length) of the web's progress --g */
+    stroke-dasharray: 1; stroke-dashoffset: calc(1 - clamp(0, (var(--g, 0) - var(--a)) / var(--b), 1));
+  }
+  .web path.ring { stroke: rgba(228, 232, 242, .38); }
+  .intro-copy { z-index: 14; } /* captions stay bright above the darkening */
+  .lair.done { visibility: hidden; }
+
   /* Phone rig: one phone for the whole page, transformed by scroll during the intro */
   .stage { z-index: 5; }
   .chapters { position: relative; z-index: 6; }
-  .phone-rig { perspective: 1100px; will-change: transform; }
-  .phone-flip {
-    position: relative; transform-style: preserve-3d; will-change: transform;
-    --depth: calc(var(--phone-w) * .075);
-  }
-  .phone {
-    backface-visibility: hidden; -webkit-backface-visibility: hidden;
-    transform: translateZ(calc(var(--depth) / 2));
-  }
-  /* Thickness: thin rounded slices stacked between the faces form the metal frame */
+  /* The flip is drawn in 2D (no preserve-3d): the script squashes each face by cos(angle)
+     and widens one edge layer behind them to the turning slab's outline. Three layers in
+     total, instead of a 3D scene of two faces plus 14 stacked edge slices. */
+  .phone-rig, .phone-flip, .phone { will-change: transform; }
+  .phone-flip { position: relative; }
+  /* Metal frame: one rounded plate behind the faces, only shown while the phone is turning */
   .phone-edge {
     position: absolute; inset: 0; border-radius: calc(var(--phone-w) * .17);
-    background: linear-gradient(90deg, #8A8F99, #4A4E57 3%, #2B2D33 10%, #2B2D33 90%, #4A4E57 97%, #8A8F99);
-  }
-  .phone-edge:nth-child(odd) { /* pre-brightened colours (was filter: brightness(1.12), costly in 3D) */
-    background: linear-gradient(90deg, #9AA0AB, #535761 3%, #303239 10%, #303239 90%, #535761 97%, #9AA0AB);
+    background: linear-gradient(90deg, #9AA0AB, #4A4E57 3%, #2B2D33 10%, #2B2D33 90%, #4A4E57 97%, #9AA0AB);
+    visibility: hidden; will-change: transform;
   }
   /* Lighting: faces darken as they turn away; a glare sweeps across during the flip */
   .phone::before, .phone-back::after {
@@ -326,8 +343,7 @@
   }
   .phone { border-radius: calc(var(--phone-w) * .17); }
   .phone-back {
-    position: absolute; inset: 0; transform: rotateY(180deg) translateZ(calc(var(--depth) / 2));
-    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    position: absolute; inset: 0; visibility: hidden; will-change: transform;
     border-radius: calc(var(--phone-w) * .17);
     background: linear-gradient(150deg, #474B54, #24262C 45%, #1A1B20 70%, #34373E);
     box-shadow: inset 0 0 0 2px #5A5F69, inset 0 0 0 5px #1B1C21, 0 40px 80px -20px rgba(0,0,0,.7);
@@ -732,6 +748,8 @@
     </g>
   </svg>
 </div>
+
+<div class="lair" id="lair" aria-hidden="true"><div class="lair-dim" id="lairDim"></div></div>
 
 <!-- Album scene (after the pocket): floating photos that react to the cursor; click to open -->
 <section class="album" id="album" aria-label="Photos in your camera roll">
@@ -1211,15 +1229,84 @@
   $('camView').src = `assets/hero/${P.img}-1200.webp`;
   $('camView').style.setProperty('--fx', P.fx);
 
-  // Build the phone's thickness from stacked slices between the front and back faces.
-  const SLICES = 14;
-  for (let i = 0; i < SLICES; i++) {
-    const s = document.createElement('div');
-    s.className = 'phone-edge';
-    const z = ((i + 0.5) / SLICES - 0.5) * 0.96;
-    s.style.transform = `translateZ(calc(var(--depth) * ${z.toFixed(3)}))`;
-    flip.insertBefore(s, flip.firstChild);
+  // Phone parts for the 2D flip: one edge plate (behind), the front face and the back face.
+  const edge = document.createElement('div');
+  edge.className = 'phone-edge';
+  flip.insertBefore(edge, flip.firstChild);
+  const front = flip.querySelector('.phone'), back = flip.querySelector('.phone-back');
+  const DEPTH = 0.075 / 1.07; // phone thickness as a share of its outer width (screen width × .075)
+
+  // Draws the phone turned `deg` about its vertical axis, as seen straight on (orthographic):
+  // each face is squashed by cos and shifted by ±depth/2 · sin; the edge plate fills the outline
+  // between them, which for a rounded slab is one rounded rectangle cos·W + sin·D wide.
+  function turnPhone(deg) {
+    const th = deg * Math.PI / 180, co = Math.cos(th), si = Math.sin(th);
+    const turning = Math.abs(si) > 0.002;
+    const W = base.pw, D = W * DEPTH;
+    css(edge, 'visibility', turning ? 'visible' : 'hidden');
+    css(edge, 'transform', turning ? `scaleX(${((W * Math.abs(co) + D * Math.abs(si)) / W).toFixed(4)})` : '');
+    css(front, 'visibility', co > 0 ? '' : 'hidden');
+    css(front, 'transform', co > 0 && turning ? `translateX(${(D / 2 * si).toFixed(2)}px) scaleX(${co.toFixed(4)})` : '');
+    css(back, 'visibility', co < 0 ? 'visible' : 'hidden');
+    css(back, 'transform', co < 0 && turning ? `translateX(${(-D / 2 * si).toFixed(2)}px) scaleX(${(-co).toFixed(4)})` : '');
   }
+
+  // Cobwebs for the pocket scene: one per corner, drawn as radial threads plus sagging rings.
+  // Each is drawn with its corner at (0,0) and mirrored into place.
+  const lair = $('lair'), lairDim = $('lairDim');
+  const webs = (() => {
+    const NS = 'http://www.w3.org/2000/svg';
+    let seed = 11;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    // corner · start delay (share of the grow) · size
+    return [['tl', 0, 1], ['tr', .14, .85], ['bl', .26, .6], ['br', .34, .7]].map(([corner, delay, size]) => {
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 100 100');
+      svg.classList.add('web', corner);
+      const g = document.createElementNS(NS, 'g');
+      const fx = corner[1] === 'r', fy = corner[0] === 'b';
+      g.setAttribute('transform', `translate(${fx ? 100 : 0} ${fy ? 100 : 0}) scale(${fx ? -1 : 1} ${fy ? -1 : 1})`);
+      const thread = (d, cls, a, b) => {
+        const p = document.createElementNS(NS, 'path');
+        p.setAttribute('d', d); p.setAttribute('pathLength', '1');
+        if (cls) p.setAttribute('class', cls);
+        p.style.setProperty('--a', a); p.style.setProperty('--b', b);
+        g.appendChild(p);
+      };
+      // Radial threads fanning out from the corner
+      const N = 7, rays = [];
+      for (let i = 0; i < N; i++) {
+        const ang = (4 + (i / (N - 1)) * 82 + (rnd() - .5) * 8) * Math.PI / 180;
+        const len = (78 + rnd() * 30) * size;
+        rays.push({ cx: Math.cos(ang), cy: Math.sin(ang), len });
+        thread(`M0 0L${(Math.cos(ang) * len).toFixed(1)} ${(Math.sin(ang) * len).toFixed(1)}`, '', (rnd() * .1).toFixed(3), .45);
+      }
+      // Rings: sagging strands between neighbouring threads, spun from the inside out
+      const RINGS = 8;
+      for (let k = 1; k <= RINGS; k++) {
+        let d = '';
+        const r0 = 100 * size * Math.pow(k / (RINGS + 1), 1.15);
+        let prev = null;
+        rays.forEach(ray => {
+          const r = r0 * (0.92 + rnd() * .16);
+          if (r > ray.len * .96) { prev = null; return; }
+          const pt = [ray.cx * r, ray.cy * r];
+          if (prev) {
+            const mx = (prev[0] + pt[0]) / 2 * .86, my = (prev[1] + pt[1]) / 2 * .86; // sag towards the corner
+            d += `M${prev[0].toFixed(1)} ${prev[1].toFixed(1)}Q${mx.toFixed(1)} ${my.toFixed(1)} ${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`;
+          }
+          prev = pt;
+        });
+        if (d) thread(d, 'ring', (.3 + .55 * (k - 1) / RINGS).toFixed(3), .18);
+      }
+      // One long anchor strand drifting off the edge
+      const a = (35 + rnd() * 20) * Math.PI / 180, L = 120 * size;
+      thread(`M0 0Q${(Math.cos(a) * L * .5 + 6).toFixed(1)} ${(Math.sin(a) * L * .5 + 6).toFixed(1)} ${(Math.cos(a) * L).toFixed(1)} ${(Math.sin(a) * L).toFixed(1)}`, '', .05, .6);
+      svg.appendChild(g);
+      lair.appendChild(svg);
+      return { el: svg, delay };
+    });
+  })();
 
   const clamp01 = x => Math.min(1, Math.max(0, x));
   const seg = (t, a, b) => clamp01((t - a) / (b - a));
@@ -1233,7 +1320,7 @@
     rig.style.transform = 'none';
     const r = rig.getBoundingClientRect();
     rig.style.transform = prev;
-    base = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height };
+    base = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height, pw: flip.offsetWidth };
   }
 
   // Timeline in viewport heights of scroll:
@@ -1258,11 +1345,13 @@
     const t = toT(scrollY / vh, narrow);
     const done = t >= END;
     document.documentElement.classList.toggle('intro-active', t < END - 0.2);
-    [els.bg, els.copy, els.pocket].forEach(e => e.classList.toggle('done', done));
+    [els.bg, els.copy, els.pocket, lair].forEach(e => e.classList.toggle('done', done));
     if (done) {
       album.set(0, 0, 1);
       if (lastT < END) {
         css(rig, 'transform', ''); css(flip, 'transform', ''); css(els.camera, 'opacity', 0);
+        if (base) turnPhone(0);
+        css(lair, 'visibility', 'hidden');
         ['--shade', '--glare', '--gloss'].forEach(v => css(flip, v, ''));
       }
       lastT = t;
@@ -1291,8 +1380,9 @@
     const rot = 180 * b + 180 * c;
     css(rig, 'transform', `translate3d(${tx}px, ${ty}px, 0) scale(${s})`);
     const turning = Math.sin(Math.PI * b) + Math.sin(Math.PI * c);
-    css(flip, 'transform',
-      `rotateX(${8 * turning}deg) rotateY(${rot}deg) rotateZ(${-6 * Math.sin(Math.PI * b)}deg)`);
+    const tilt = -6 * Math.sin(Math.PI * b); // slight wobble as it drops into the pocket
+    css(flip, 'transform', Math.abs(tilt) > 0.01 ? `rotate(${tilt.toFixed(2)}deg)` : '');
+    turnPhone(rot);
     const face = Math.abs(Math.cos(rot * Math.PI / 180)); // 1 = facing viewer, 0 = side-on
     css(flip, '--shade', ((1 - face) * 0.6).toFixed(3));
     css(flip, '--glare', ((rot % 180) / 180).toFixed(3));
@@ -1319,6 +1409,18 @@
     css(els.pocket, 'transform', `translate3d(-50%, ${ease(clear) * innerHeight * 0.55}px, 0)`);
     css(els.pocket, 'top', pocketTop + 'px');
     css(els.bg, 'opacity', 1 - seg(t, 4.9, 5.15));
+
+    // Left in the pocket: the scene darkens and cobwebs spin out from the corners,
+    // then both clear as the phone is lifted back out.
+    const dusk = seg(t, 2.4, 2.76), dawn = seg(t, 2.85, 3.05);
+    css(lair, 'visibility', dusk > 0 && dawn < 1 ? 'visible' : 'hidden');
+    css(lairDim, 'opacity', (ease(dusk) * (1 - dawn)).toFixed(3));
+    webs.forEach(w => {
+      const p = clamp01((dusk - w.delay) / (1 - w.delay));
+      css(w.el, '--g', p.toFixed(3));
+      css(w.el, 'opacity', (Math.min(1, p * 3) * (1 - dawn)).toFixed(3));
+      css(w.el, 'transform', `scale(${(0.55 + 0.45 * ease(p)).toFixed(3)})`);
+    });
 
     // Album of floating photos between the pocket and the app
     album.set(band(t, 3.0, 3.3, 4.55, 4.85), seg(t, 3.0, 3.45), seg(t, 4.55, 4.85));
@@ -1605,6 +1707,116 @@
   addEventListener('load', relayout);
   intro();
   update();
+
+  /* ---------- Intro scenes: one scroll gesture moves one scene, and the animation plays itself ---------- */
+  // Resting points on the intro timeline (see the timeline notes above intro()):
+  // hero photo · photo just taken · phone in the pocket · album · app (end of intro)
+  const SCENES = [0, 1.7, 2.76, 4.0, END];
+  const SCENE_EXTRA_MS = [0, 0, 700, 0, 0]; // give the cobwebs time to creep in
+  const fromT = (t, narrow) => { // inverse of toT: timeline position -> scroll in screens
+    const hold = narrow ? HOLD_PHONE : HOLD_DESKTOP;
+    if (t <= HOLD_A) return t;
+    if (t < HOLD_B) return HOLD_A + (t - HOLD_A) * hold / (HOLD_B - HOLD_A);
+    return t - squeeze(narrow);
+  };
+  const screenPx = narrow => getLayout().spacerH / (END - squeeze(narrow));
+  const introEnd = () => getLayout().spacerH; // scroll position where the intro hands over to the page
+  const nowT = () => { const n = mqNarrow.matches; return toT(scrollY / screenPx(n), n); };
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const lightboxOpen = () => !$('lightbox').hidden;
+
+  let anim = null; // the scene transition currently playing
+  function goTo(i) {
+    const n = mqNarrow.matches, px = screenPx(n);
+    i = Math.max(0, Math.min(SCENES.length - 1, i));
+    const a = nowT(), b = SCENES[i];
+    if (Math.abs(b - a) < 0.005) return;
+    const dur = (reduceMotion.matches ? 0.35 : 1) * (500 + 750 * Math.abs(b - a) + SCENE_EXTRA_MS[i]);
+    const start = performance.now();
+    anim = { raf: 0 };
+    const step = now => {
+      const p = Math.min(1, (now - start) / dur);
+      const k = (1 - Math.cos(Math.PI * p)) / 2; // ease in and out
+      scrollTo({ top: fromT(a + (b - a) * k, n) * px, behavior: 'instant' });
+      if (p < 1) anim.raf = requestAnimationFrame(step); else anim = null;
+    };
+    anim.raf = requestAnimationFrame(step);
+  }
+  // Next resting point ahead (dir 1) or behind (dir -1) of where we are now
+  function sceneStep(dir) {
+    const t = nowT();
+    const i = dir > 0 ? SCENES.findIndex(s => s > t + 0.01) : SCENES.findLastIndex(s => s < t - 0.01);
+    if (i >= 0) goTo(i);
+  }
+  // Inside the intro, or at its end and heading back up into it
+  const inIntro = dir => scrollY < introEnd() - 1 || (scrollY <= introEnd() + 1 && dir < 0);
+
+  // Wheel / trackpad: one step per gesture. A gesture ends after a short pause in wheel events,
+  // so a trackpad's momentum tail can't trigger a second step or carry on into the page.
+  let lastWheel = 0, gestureUsed = false, acc = 0;
+  addEventListener('wheel', e => {
+    if (e.ctrlKey || lightboxOpen()) return;
+    const now = performance.now();
+    if (now - lastWheel > 220) { gestureUsed = false; acc = 0; }
+    lastWheel = now;
+    if (anim || gestureUsed) { e.preventDefault(); return; }
+    const dy = e.deltaY * (e.deltaMode === 1 ? 16 : 1);
+    if (!inIntro(dy)) {
+      // Scrolling up from the page: stop at the end of the intro rather than sliding into its middle
+      if (dy < 0 && scrollY + dy < introEnd()) {
+        e.preventDefault(); gestureUsed = true;
+        scrollTo({ top: introEnd(), behavior: 'instant' });
+      }
+      return;
+    }
+    e.preventDefault();
+    acc += dy;
+    if (Math.abs(acc) < 25) return;
+    gestureUsed = true;
+    sceneStep(Math.sign(acc));
+  }, { passive: false });
+
+  // Touch: one swipe = one step
+  let touchY = null, touchUsed = false;
+  addEventListener('touchstart', e => { touchY = e.touches[0].clientY; touchUsed = false; }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (touchY === null || lightboxOpen()) return;
+    const dy = touchY - e.touches[0].clientY; // > 0: swiping up, i.e. scrolling down
+    if (!anim && !touchUsed && !inIntro(dy)) return;
+    if (e.cancelable) e.preventDefault();
+    if (anim || touchUsed || Math.abs(dy) < 30) return;
+    touchUsed = true;
+    sceneStep(Math.sign(dy));
+  }, { passive: false });
+
+  // Keyboard
+  addEventListener('keydown', e => {
+    if (lightboxOpen() || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === ' ' && e.target.closest?.('button, a, input, textarea')) return;
+    const dir = { ArrowDown: 1, PageDown: 1, ArrowUp: -1, PageUp: -1, ' ': e.shiftKey ? -1 : 1 }[e.key];
+    if (!dir || !(anim || inIntro(dir))) return;
+    e.preventDefault();
+    if (!anim) sceneStep(dir);
+  });
+
+  // Anything else that leaves the intro between scenes (scrollbar drag, reload mid-way):
+  // once scrolling settles, glide to the nearest scene.
+  let settle = 0;
+  function settleIntro() {
+    if (anim || lightboxOpen() || scrollY >= introEnd() - 1) return;
+    const n = mqNarrow.matches, px = screenPx(n);
+    const ys = SCENES.map(s => fromT(s, n) * px);
+    if (ys.some(y => Math.abs(y - scrollY) < 3)) return;
+    let best = 0;
+    ys.forEach((y, i) => { if (Math.abs(y - scrollY) < Math.abs(ys[best] - scrollY)) best = i; });
+    goTo(best);
+  }
+  addEventListener('scroll', () => {
+    if (anim) return;
+    clearTimeout(settle);
+    settle = setTimeout(settleIntro, 200);
+  }, { passive: true });
+  addEventListener('load', () => setTimeout(settleIntro, 200));
 
   /* ---------- Download section: draw the Osaka → Sendai route when it scrolls in ---------- */
   const cta = document.getElementById('download');
