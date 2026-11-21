@@ -135,10 +135,8 @@
   .album-cloud { position: absolute; inset: 0; z-index: 1; }
   /* Faint fill: many small, soft copies far behind, for the "thousands" feel */
   .album-fill { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
-  .album-fill img {
-    position: absolute; left: 0; top: 0; display: block; height: auto; border-radius: 4px;
-    border: 2px solid rgba(244, 241, 234, .9); will-change: transform, opacity;
-  }
+  /* Pre-blurred canvases (blur is baked in once by script instead of a live CSS filter) */
+  .album-fill canvas { position: absolute; left: 0; top: 0; display: block; will-change: transform, opacity; opacity: 0; }
   .ph {
     position: absolute; left: 0; top: 0; padding: 0; border: 0; background: none; cursor: zoom-in;
     width: var(--w); will-change: transform, opacity; opacity: 0;
@@ -198,6 +196,9 @@
     background: linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,.15) 55%, rgba(0,0,0,.35));
     opacity: var(--scrim, 1);
   }
+  /* Full-screen layers faded by scroll: own GPU layers so opacity changes don't repaint them */
+  .intro-bg, .intro-bg::after, .intro-dark, .denim { will-change: opacity; }
+  .intro-hero, .intro-caption { will-change: transform, opacity; }
   .intro-dark { position: absolute; inset: 0; background: #0B0C0F; opacity: 0; }
   .denim {
     position: absolute; inset: 0; opacity: 0;
@@ -289,6 +290,7 @@
     position: fixed; z-index: 12; left: 50%; top: 58vh; pointer-events: none; opacity: 0;
     width: calc(var(--pw, 330px) * 1.72); aspect-ratio: 200 / 220;
     filter: drop-shadow(0 -4px 10px rgba(0,0,0,.45)) drop-shadow(0 10px 18px rgba(0,0,0,.35));
+    will-change: transform, opacity; /* rasterise the noise + shadows once, then just move the layer */
   }
   .pocket svg { display: block; width: 100%; height: 100%; }
 
@@ -309,7 +311,9 @@
     position: absolute; inset: 0; border-radius: calc(var(--phone-w) * .17);
     background: linear-gradient(90deg, #8A8F99, #4A4E57 3%, #2B2D33 10%, #2B2D33 90%, #4A4E57 97%, #8A8F99);
   }
-  .phone-edge:nth-child(odd) { filter: brightness(1.12); }
+  .phone-edge:nth-child(odd) { /* pre-brightened colours (was filter: brightness(1.12), costly in 3D) */
+    background: linear-gradient(90deg, #9AA0AB, #535761 3%, #303239 10%, #303239 90%, #535761 97%, #9AA0AB);
+  }
   /* Lighting: faces darken as they turn away; a glare sweeps across during the flip */
   .phone::before, .phone-back::after {
     content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
@@ -410,6 +414,14 @@
   .styles > .beat:first-child { position: sticky; top: calc(50vh - 160px); min-height: 0; padding-top: 0; }
   .styles > .beat:not(:first-child) { min-height: 50vh; }
   .styles > .beat:last-child { min-height: 70vh; }
+  /* Staggered scroll (desktop): each beat's text pins at the middle of the screen for
+     --dwell of scrolling, then carries on. The ::after spacer is the room it stays pinned for. */
+  @media (min-width: 881px) {
+    :root { --dwell: 40vh; }
+    .chapters .beat.dwell { display: block; min-height: 0; padding: 15vh 0; }
+    .beat.dwell::after { content: ""; display: block; height: var(--dwell); }
+    .beat.dwell > .beat-inner { position: sticky; top: 50vh; transform: translateY(-50%); }
+  }
 
   .eyebrow {
     font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
@@ -998,6 +1010,50 @@
   const chapters = [...document.querySelectorAll('.chapter')];
   const beats = [...document.querySelectorAll('.beat[data-screen]')];
   const imgs = {};
+  const mqNarrow = matchMedia('(max-width: 880px)');
+
+  // Wrap each feature beat's copy so it can pin while you scroll (see .beat.dwell).
+  // Skips the hero (straight after the intro) and the map-styles beats, which pin differently.
+  beats.forEach(beat => {
+    if (beat.closest('.hero, .styles') || !beat.children.length) return;
+    const inner = document.createElement('div');
+    inner.className = 'beat-inner';
+    inner.append(...beat.childNodes);
+    beat.appendChild(inner);
+    beat.classList.add('dwell');
+  });
+
+  // Style writes go through css(): skips the write when the value hasn't changed,
+  // so idle parts of the scroll timeline don't trigger style recalcs or repaints.
+  const styleCache = new WeakMap();
+  function css(el, prop, val) {
+    val = String(val);
+    let m = styleCache.get(el);
+    if (!m) styleCache.set(el, m = {});
+    if (m[prop] === val) return;
+    m[prop] = val;
+    if (prop.startsWith('--')) el.style.setProperty(prop, val); else el.style[prop] = val;
+  }
+  function text(el, val) { if (el.textContent !== val) el.textContent = val; }
+
+  // Layout positions, measured once (and again on resize / content size changes) instead of
+  // calling getBoundingClientRect on every scroll frame, which forced a full reflow each frame.
+  let layout = null;
+  function measureLayout() {
+    const stageH = stage.getBoundingClientRect().height;
+    css(document.documentElement, '--stage-h', stageH + 'px');
+    const sy = scrollY;
+    layout = {
+      stageH,
+      beats: beats.map(b => { const r = b.getBoundingClientRect(); return [r.top + sy, r.bottom + sy]; }),
+      navTops: navNodes.map(n => n.getBoundingClientRect().top + sy),
+      spacerH: spacer.offsetHeight,
+    };
+    const start = layout.navTops[0], end = layout.navTops[layout.navTops.length - 1];
+    layout.navPos = layout.navTops.map(t => (t - start) / Math.max(1, end - start));
+    layout.navPos.forEach((p, i) => css(navStops[i], 'top', (p * 100) + '%'));
+  }
+  const getLayout = () => layout || (measureLayout(), layout);
 
   // One <img> per unique screen, stacked inside the phone.
   beats.forEach((beat, i) => {
@@ -1048,9 +1104,8 @@
   // The beat crossing the "reading line" drives the phone.
   // Desktop: middle of the viewport. Mobile: middle of the area below the pinned phone.
   function readingLine() {
-    const stageH = stage.getBoundingClientRect().height;
-    document.documentElement.style.setProperty('--stage-h', stageH + 'px');
-    return matchMedia('(max-width: 880px)').matches
+    const stageH = getLayout().stageH;
+    return mqNarrow.matches
       ? stageH + (innerHeight - stageH) * 0.35
       : innerHeight * 0.5;
   }
@@ -1069,12 +1124,13 @@
   function update() {
     topbar.classList.toggle('scrolled', scrollY > 10);
     const line = readingLine();
+    const sy = scrollY;
     let best = beats[0], bestDist = Infinity;
-    for (const b of beats) {
-      const r = b.getBoundingClientRect();
-      const d = r.top <= line && r.bottom >= line ? 0 : Math.min(Math.abs(r.top - line), Math.abs(r.bottom - line));
+    beats.forEach((b, i) => {
+      const top = layout.beats[i][0] - sy, bottom = layout.beats[i][1] - sy;
+      const d = top <= line && bottom >= line ? 0 : Math.min(Math.abs(top - line), Math.abs(bottom - line));
       if (d < bestDist) { bestDist = d; best = b; }
-    }
+    });
     setActive(best);
     updateRoute(line);
   }
@@ -1103,15 +1159,14 @@
     rnTrack.appendChild(b);
     return b;
   });
+  const rnPuck = document.getElementById('rnPuck'), rnDone = document.getElementById('rnDone');
+  const rnNextLabel = document.getElementById('rnNextLabel'), rnNext = document.getElementById('rnNext');
   let lastY = scrollY;
   function updateRoute(line) {
     // Route runs from the first chapter to the download section; stops sit at their real offsets.
-    const tops = navNodes.map(n => n.getBoundingClientRect().top + scrollY);
-    const start = tops[0], end = tops[tops.length - 1];
-    const span = Math.max(1, end - start);
+    const tops = getLayout().navTops, pos = layout.navPos;
+    const end = tops[tops.length - 1];
     const at = scrollY + line;
-    const pos = tops.map(t => (t - start) / span);
-    pos.forEach((p, i) => { navStops[i].style.top = (p * 100) + '%'; });
     // Highlight the same section the phone is showing; the destination once you reach it.
     let cur = current ? Math.max(0, navNodes.indexOf(current.closest('.chapter'))) : 0;
     if (at >= end - 2) cur = navNodes.length - 1;
@@ -1127,11 +1182,11 @@
       b.classList.toggle('passed', i < cur);
       b.classList.toggle('current', i === cur);
     });
-    document.getElementById('rnPuck').style.top = (f * 100) + '%';
-    document.getElementById('rnDone').style.height = (f * 100) + '%';
+    css(rnPuck, 'top', (f * 100).toFixed(2) + '%');
+    css(rnDone, 'height', (f * 100).toFixed(2) + '%');
     const next = navNodes[cur + 1];
-    document.getElementById('rnNextLabel').textContent = next ? 'Next' : 'Arrived';
-    document.getElementById('rnNext').textContent = next ? next.dataset.nav : 'Download';
+    text(rnNextLabel, next ? 'Next' : 'Arrived');
+    text(rnNext, next ? next.dataset.nav : 'Download');
     // Hide once you've passed the destination (support & privacy below)
     routeNav.classList.toggle('off', at > end + innerHeight * 0.6);
     // Heading arrow flips when scrolling back up
@@ -1198,8 +1253,8 @@
   }
   let lastT = -1;
   function intro() {
-    const narrow = matchMedia('(max-width: 880px)').matches;
-    const vh = spacer.offsetHeight / (END - squeeze(narrow));
+    const narrow = mqNarrow.matches;
+    const vh = getLayout().spacerH / (END - squeeze(narrow));
     const t = toT(scrollY / vh, narrow);
     const done = t >= END;
     document.documentElement.classList.toggle('intro-active', t < END - 0.2);
@@ -1207,8 +1262,8 @@
     if (done) {
       album.set(0, 0, 1);
       if (lastT < END) {
-        rig.style.transform = ''; flip.style.transform = ''; els.camera.style.opacity = 0;
-        ['--shade', '--glare', '--gloss'].forEach(v => flip.style.removeProperty(v));
+        css(rig, 'transform', ''); css(flip, 'transform', ''); css(els.camera, 'opacity', 0);
+        ['--shade', '--glare', '--gloss'].forEach(v => css(flip, v, ''));
       }
       lastT = t;
       return;
@@ -1216,7 +1271,7 @@
     lastT = t;
     if (!base) measure();
 
-    const mobile = matchMedia('(max-width: 880px)').matches;
+    const mobile = narrow;
     const S = mobile ? 1.35 : 1;
     const H = base.h * S;
     const offY = innerHeight / 2 + H / 2 + 60;
@@ -1234,52 +1289,52 @@
     const ty = (innerHeight / 2 - base.cy) * k + y;
     const s = 1 + (S - 1) * k;
     const rot = 180 * b + 180 * c;
-    rig.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${s})`;
+    css(rig, 'transform', `translate3d(${tx}px, ${ty}px, 0) scale(${s})`);
     const turning = Math.sin(Math.PI * b) + Math.sin(Math.PI * c);
-    flip.style.transform =
-      `rotateX(${8 * turning}deg) rotateY(${rot}deg) rotateZ(${-6 * Math.sin(Math.PI * b)}deg)`;
+    css(flip, 'transform',
+      `rotateX(${8 * turning}deg) rotateY(${rot}deg) rotateZ(${-6 * Math.sin(Math.PI * b)}deg)`);
     const face = Math.abs(Math.cos(rot * Math.PI / 180)); // 1 = facing viewer, 0 = side-on
-    flip.style.setProperty('--shade', ((1 - face) * 0.6).toFixed(3));
-    flip.style.setProperty('--glare', ((rot % 180) / 180).toFixed(3));
-    flip.style.setProperty('--gloss', Math.min(1, turning).toFixed(3));
+    css(flip, '--shade', ((1 - face) * 0.6).toFixed(3));
+    css(flip, '--glare', ((rot % 180) / 180).toFixed(3));
+    css(flip, '--gloss', Math.min(1, turning).toFixed(3));
 
     // Front face shows the camera until it's turned away; the app is there when it turns back.
-    els.camera.style.opacity = (t < 2.85 || rot < 230) ? 1 : 0;
+    css(els.camera, 'opacity', (t < 2.85 || rot < 230) ? 1 : 0);
     const shot = band(t, 1.42, 1.47, 1.5, 1.68);
-    els.flash.style.opacity = shot * 0.9;
-    els.shutter.style.transform = `scale(${1 - 0.1 * band(t, 1.38, 1.44, 1.48, 1.56)})`;
-    els.thumb.style.backgroundImage = t > 1.48 ? `url(assets/hero/${P.img}-1200.webp)` : 'none';
+    css(els.flash, 'opacity', shot * 0.9);
+    css(els.shutter, 'transform', `scale(${1 - 0.1 * band(t, 1.38, 1.44, 1.48, 1.56)})`);
+    css(els.thumb, 'backgroundImage', t > 1.48 ? `url(assets/hero/${P.img}-1200.webp)` : 'none');
 
     // Backdrop
     const toDenim = seg(t, 1.8, 2.2);
-    els.photo.style.opacity = 1 - toDenim;
-    els.photo.style.transform = `scale(${1.08 - 0.08 * a})`;
-    els.bg.style.setProperty('--scrim', String(1 - toDenim));
+    css(els.photo, 'opacity', 1 - toDenim);
+    css(els.photo, 'transform', `scale(${1.08 - 0.08 * a})`);
+    css(els.bg, '--scrim', 1 - toDenim);
     const clear = seg(t, 2.92, 3.15);
-    els.dark.style.opacity = 0.5 * a * (1 - toDenim) + clear;
-    els.denim.style.opacity = toDenim * (1 - clear);
+    css(els.dark, 'opacity', 0.5 * a * (1 - toDenim) + clear);
+    css(els.denim, 'opacity', toDenim * (1 - clear));
     // Pocket pops in while the phone is edge-on (invisible), and slides away solid as the phone lifts out.
-    els.pocket.style.opacity = seg(t, 2.18, 2.22) * (1 - seg(t, 3.05, 3.15));
-    els.pocket.style.setProperty('--pw', base.w * S + 'px');
-    els.pocket.style.transform = `translate(-50%, ${ease(clear) * innerHeight * 0.55}px)`;
-    els.pocket.style.top = pocketTop + 'px';
-    els.bg.style.opacity = 1 - seg(t, 4.9, 5.15);
+    css(els.pocket, 'opacity', seg(t, 2.18, 2.22) * (1 - seg(t, 3.05, 3.15)));
+    css(els.pocket, '--pw', base.w * S + 'px');
+    css(els.pocket, 'transform', `translate3d(-50%, ${ease(clear) * innerHeight * 0.55}px, 0)`);
+    css(els.pocket, 'top', pocketTop + 'px');
+    css(els.bg, 'opacity', 1 - seg(t, 4.9, 5.15));
 
     // Album of floating photos between the pocket and the app
     album.set(band(t, 3.0, 3.3, 4.55, 4.85), seg(t, 3.0, 3.45), seg(t, 4.55, 4.85));
 
     // Copy
     const heroOut = seg(t, 0.2, 0.6);
-    els.hero.style.opacity = 1 - heroOut;
-    els.hero.style.transform = `translateY(${-40 * heroOut}px)`;
+    css(els.hero, 'opacity', 1 - heroOut);
+    css(els.hero, 'transform', `translateY(${-40 * heroOut}px)`);
     // Once faded, take the hero (and its clickable location card) out of the way of everything below
-    els.hero.style.visibility = heroOut > 0.95 ? 'hidden' : '';
+    css(els.hero, 'visibility', heroOut > 0.95 ? 'hidden' : '');
     const cp = band(t, 1.05, 1.3, 1.7, 1.9);
-    els.capPhoto.style.opacity = cp;
-    els.capPhoto.style.transform = `translateY(calc(${mobile ? 0 : -50}% + ${(1 - cp) * 20}px))`;
+    css(els.capPhoto, 'opacity', cp);
+    css(els.capPhoto, 'transform', `translateY(calc(${mobile ? 0 : -50}% + ${(1 - cp) * 20}px))`);
     const cq = band(t, 2.3, 2.5, 2.8, 2.95);
-    els.capPocket.style.opacity = cq;
-    els.capPocket.style.transform = `translateY(calc(${mobile ? 0 : -50}% + ${(1 - cq) * 20}px))`;
+    css(els.capPocket, 'opacity', cq);
+    css(els.capPocket, 'transform', `translateY(calc(${mobile ? 0 : -50}% + ${(1 - cq) * 20}px))`);
   }
 
   /* ---------- Album: floating photos that react to the cursor ---------- */
@@ -1334,28 +1389,66 @@
       b.style.setProperty('--r', `${((i * 37) % 17) - 8}deg`);
       b.innerHTML = `<span><img src="${p.thumb}" width="${p.size[0]}" height="${p.size[1]}" style="aspect-ratio: ${p.size[0]} / ${p.size[1]}" alt="" loading="lazy" decoding="async"></span>`;
       b.addEventListener('click', () => { if (!narrowScreen.matches) open(i); }); // no viewer on phones
+      const card = { el: b, x, y, w, d, ph: i * 1.7, hover: false };
+      // Track hover with events: calling matches(':hover') every frame forced style recalcs
+      b.addEventListener('pointerenter', () => { card.hover = true; });
+      b.addEventListener('pointerleave', () => { card.hover = false; });
       cloud.appendChild(b);
-      return { el: b, x, y, w, d, ph: i * 1.7 };
+      return card;
     });
-    // Faint fill: small, soft, see-through copies of the photos scattered behind the real ones
+    // Faint fill: small, soft, see-through copies of the photos scattered behind the real ones.
+    // Each is a canvas with the blur baked in once; 130 live CSS blur filters were re-run by
+    // the GPU every frame and were the main cause of lag in the intro.
     const fillRoot = $('albumFill');
     let seed = 66;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const fill = [];
+    const bakeScale = Math.max(0.5, Math.min(1.1, innerWidth / 1440)); // size the canvases are drawn at
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const probe = document.createElement('canvas').getContext('2d');
+    const canvasFilter = !!probe && 'filter' in probe; // older Safari: fall back to a CSS filter
     for (let n = 0, tries = 0; n < 130 && tries < 2000; tries++) {
       const x = rnd(), y = rnd();
       if (Math.abs(x - 0.5) < 0.2 && Math.abs(y - 0.5) < 0.15) continue; // keep the heading clear
       const d = 0.08 + rnd() * 0.22;           // depth: all far behind the real photos
-      const img = document.createElement('img');
-      img.src = ALBUM[n % ALBUM.length].thumb;
-      img.alt = '';
-      img.decoding = 'async';
+      const p = ALBUM[n % ALBUM.length];
       const blur = d < 0.15 ? 9 : d < 0.22 ? 7 : 5; // heavy blur keeps the fill soft, not busy
-      img.style.filter = `blur(${blur}px) saturate(.7)`;
-      fillRoot.appendChild(img);
-      fill.push({ el: img, x, y, d, w: 34 + d * 140, r: (rnd() - 0.5) * 24, a: 0.16 + d * 1.1, ph: rnd() * 6.28, k: rnd() });
+      const w = 34 + d * 140, ratio = p.size[1] / p.size[0];
+      // Photo with a 2px light border, padded so the blur has room to spread
+      const bw = w * bakeScale, bh = (bw - 4) * ratio + 4, pad = blur * 3;
+      const cv = document.createElement('canvas');
+      cv.width = Math.ceil((bw + pad * 2) * dpr); cv.height = Math.ceil((bh + pad * 2) * dpr);
+      cv.style.width = (bw + pad * 2) + 'px'; cv.style.height = (bh + pad * 2) + 'px';
+      if (!canvasFilter) cv.style.filter = `blur(${blur}px) saturate(.7)`;
+      fillRoot.appendChild(cv);
+      fill.push({ el: cv, x, y, d, w, ratio, blur, pad, bw, bh, src: p.thumb,
+        r: (rnd() - 0.5) * 24, a: 0.16 + d * 1.1, ph: rnd() * 6.28, k: rnd() });
       n++;
     }
+    function bake(f, img) {
+      const cv = f.el, D = dpr;
+      const o = document.createElement('canvas');
+      o.width = cv.width; o.height = cv.height;
+      const g = o.getContext('2d');
+      const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); };
+      rr(f.pad * D, f.pad * D, f.bw * D, f.bh * D, 4 * D);
+      g.fillStyle = 'rgba(244, 241, 234, .9)'; g.fill();
+      g.save();
+      rr((f.pad + 2) * D, (f.pad + 2) * D, (f.bw - 4) * D, (f.bh - 4) * D, 2 * D);
+      g.clip();
+      g.drawImage(img, (f.pad + 2) * D, (f.pad + 2) * D, (f.bw - 4) * D, (f.bh - 4) * D);
+      g.restore();
+      const ctx = cv.getContext('2d');
+      if (canvasFilter) ctx.filter = `blur(${f.blur * D}px) saturate(.7)`;
+      ctx.drawImage(o, 0, 0);
+    }
+    // Load each thumbnail once, then bake every fill copy of it
+    [...new Set(fill.map(f => f.src))].forEach(src => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => fill.forEach(f => { if (f.src === src) bake(f, img); });
+      img.src = src;
+    });
 
     let vis = 0, enter = 0, exit = 0, running = false, t0 = performance.now();
     const mouse = { x: 0, y: 0, tx: 0, ty: 0, px: -9999, py: -9999 };
@@ -1381,8 +1474,8 @@
           : c.y < 50 ? 11 + (c.y - 8) / 42 * 22 : 68 + (c.y - 50) / 40 * 22;
         let x = c.x / 100 * innerWidth, y = yp / 100 * innerHeight;
         // The photo under the cursor holds still (it only enlarges, via CSS) so it's easy to click
-        if (c.el.matches(':hover') && c.last && exit === 0 && enter >= 1) {
-          c.el.style.opacity = 1;
+        if (c.hover && c.last && exit === 0 && enter >= 1) {
+          css(c.el, 'opacity', 1);
           return;
         }
         if (!still && !narrowScreen.matches) { // no float or parallax on narrow screens
@@ -1398,11 +1491,11 @@
         const pop = 1 - Math.pow(1 - ein, 3);
         x += (cx - x) * exit; y += (cy - y) * exit;
         const s = (0.6 + 0.4 * pop) * (1 - 0.75 * exit);
-        c.el.style.setProperty('--w', w + 'px');
-        c.el.style.transform = `translate3d(${x - w / 2}px, ${y - w * 0.4}px, 0) scale(${s})`;
+        css(c.el, '--w', w + 'px');
+        css(c.el, 'transform', `translate3d(${x - w / 2}px, ${y - w * 0.4}px, 0) scale(${s})`);
         c.last = true;
-        c.el.style.opacity = pop * (1 - exit);
-        c.el.style.zIndex = Math.round(c.d * 10);
+        css(c.el, 'opacity', pop * (1 - exit));
+        css(c.el, 'zIndex', Math.round(c.d * 10));
       });
       // Fill layer: fades in first, drifts slowly, barely reacts to the cursor
       for (const f of fill) {
@@ -1414,18 +1507,20 @@
         }
         const fin = Math.min(1, Math.max(0, enter * 2 - f.k * 0.9));
         x += (cx - x) * exit; y += (cy - y) * exit;
-        f.el.style.width = w + 'px';
-        f.el.style.transform = `translate3d(${x - w / 2}px, ${y - w * 0.4}px, 0) rotate(${f.r}deg) scale(${1 - 0.7 * exit})`;
-        f.el.style.opacity = f.a * fin * (1 - exit);
+        // Centre the padded canvas where the photo's centre used to be; scale it from its baked size
+        const h = (w - 4) * f.ratio + 4;
+        const ox = x - (f.bw / 2 + f.pad), oy = y - w * 0.4 + h / 2 - (f.bh / 2 + f.pad);
+        css(f.el, 'transform', `translate3d(${ox}px, ${oy}px, 0) rotate(${f.r}deg) scale(${(scale / bakeScale) * (1 - 0.7 * exit)})`);
+        css(f.el, 'opacity', f.a * fin * (1 - exit));
       }
-      countEl.textContent = Math.round(10832 * (1 - Math.pow(1 - enter, 3))).toLocaleString('en-AU');
+      text(countEl, Math.round(10832 * (1 - Math.pow(1 - enter, 3))).toLocaleString('en-AU'));
       if (vis > 0) requestAnimationFrame(frame); else running = false;
     }
     function set(v, e, x) {
       vis = v; enter = e; exit = x;
-      root.style.opacity = v;
+      css(root, 'opacity', v);
       root.classList.toggle('live', v > 0.02);
-      root.style.pointerEvents = v > 0.5 ? 'auto' : 'none';
+      css(root, 'pointerEvents', v > 0.5 ? 'auto' : 'none');
       if (v > 0 && !running) { running = true; requestAnimationFrame(frame); }
     }
 
@@ -1501,7 +1596,13 @@
     requestAnimationFrame(() => { intro(); update(); ticking = false; });
   };
   addEventListener('scroll', onScroll, { passive: true });
-  addEventListener('resize', () => { base = null; lastT = -1; onScroll(); });
+  const relayout = () => { layout = null; onScroll(); };
+  addEventListener('resize', () => { base = null; lastT = -1; relayout(); });
+  // Re-measure cached positions when content changes size (fonts, images, breakpoints)
+  new ResizeObserver(relayout).observe(document.querySelector('.chapters'));
+  new ResizeObserver(relayout).observe(stage);
+  document.fonts?.ready.then(relayout);
+  addEventListener('load', relayout);
   intro();
   update();
 
